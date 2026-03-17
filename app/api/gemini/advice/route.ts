@@ -47,7 +47,7 @@ JSON形式で回答:
   };
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const result = await model.generateContent(prompts[type] || prompts.dailyAdvice);
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { Profile, ActivityLevel, GoalType, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight } from '@/lib/calc';
 
@@ -11,8 +12,9 @@ const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
   { value: 1.9,   label: '非常に活発',   desc: '肉体労働・1日2回トレーニング' },
 ];
 
-export default function ProfilePage() {
+function ProfileContent() {
   const { profile, setProfile, hydrate } = useStore();
+  const searchParams = useSearchParams();
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
@@ -29,6 +31,11 @@ export default function ProfilePage() {
 
   useEffect(() => {
     hydrate();
+    // Apple Watch Shortcuts連携: /profile?aw=2500 でカロリーを自動セット
+    const aw = searchParams.get('aw');
+    if (aw && !isNaN(Number(aw))) {
+      setAppleWatch(aw);
+    }
   }, []);
 
   useEffect(() => {
@@ -214,9 +221,10 @@ export default function ProfilePage() {
         </div>
         {goalType !== 'maintain' && (
           <div>
-            <label className="text-sm font-semibold text-gray-600 block mb-2">目標達成日 <span className="font-normal text-xs text-gray-400">（YYYY-MM-DD）</span></label>
-            <input className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="例: 2026-09-01" value={targetDate} onChange={e => setTargetDate(e.target.value)} />
+            <label className="text-sm font-semibold text-gray-600 block mb-2">目標達成日</label>
+            <input type="date" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              min={new Date().toISOString().split('T')[0]}
+              value={targetDate} onChange={e => setTargetDate(e.target.value)} />
           </div>
         )}
       </div>
@@ -227,10 +235,27 @@ export default function ProfilePage() {
           <span className="text-2xl">⌚</span>
           <div>
             <h2 className="font-bold">Apple Watch 連携</h2>
-            <p className="text-xs text-gray-400">今日の消費カロリーを手動で入力</p>
+            <p className="text-xs text-gray-400">Shortcutで自動連携 または 手動入力</p>
           </div>
         </div>
-        <p className="text-xs text-gray-400 mb-3">Apple Watch の「アクティビティ」アプリで確認できる「消費カロリー（アクティブ＋安静時）」の合計を入力すると、TDEE推定値より正確な計算ができます。</p>
+
+        {/* 自動連携説明 */}
+        <div className="bg-gray-800 rounded-xl p-3 mb-3">
+          <p className="text-xs text-blue-300 font-semibold mb-2">⚡ Shortcutsで自動連携する方法</p>
+          <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
+            <li>iPhoneの「ショートカット」アプリを開く</li>
+            <li>新規ショートカットを作成</li>
+            <li>「ヘルスケア」→「ヘルスケアサンプルを検索」を追加
+              <br/><span className="ml-4 text-gray-500">種類: アクティブエネルギー消費量</span></li>
+            <li>同様に「安静時エネルギー」も取得</li>
+            <li>「計算」で2つを合計</li>
+            <li>「URLを開く」を追加:
+              <br/><span className="ml-4 text-blue-400 break-all">https://calorie-web-theta.vercel.app/api/apple-watch?calories=[合計値]</span></li>
+          </ol>
+          <p className="text-xs text-gray-500 mt-2">★ オートメーションで毎朝自動実行すると便利です</p>
+        </div>
+
+        <p className="text-xs text-gray-400 mb-2">手動入力（今日の合計消費カロリー）</p>
         <div className="flex items-center gap-2 bg-gray-800 rounded-xl px-4">
           <input className="flex-1 py-3 text-xl font-bold bg-transparent focus:outline-none text-white placeholder-gray-600"
             type="number" placeholder="2500" value={appleWatch} onChange={e => setAppleWatch(e.target.value)} />
@@ -271,5 +296,13 @@ export default function ProfilePage() {
         {saved ? '✓ 保存しました' : '保存する'}
       </button>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-400">読み込み中...</div>}>
+      <ProfileContent />
+    </Suspense>
   );
 }
