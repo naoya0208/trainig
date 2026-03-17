@@ -13,7 +13,7 @@ const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
 ];
 
 function ProfileContent() {
-  const { profile, setProfile, hydrate } = useStore();
+  const { profile, setProfile, hydrate, syncCode, setSyncCode, loadFromCloud, syncToCloud } = useStore();
   const searchParams = useSearchParams();
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [age, setAge] = useState('');
@@ -28,24 +28,29 @@ function ProfileContent() {
   const [aiAdvice, setAiAdvice] = useState<any>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [syncInput, setSyncInput] = useState('');
+  const [syncMsg, setSyncMsg] = useState('');
 
   useEffect(() => {
     hydrate();
+    setSyncInput(syncCode);
   }, []);
 
-  // Apple Watch自動保存: プロフィール読み込み後に1回だけ実行
-  const awSavedRef = useState(false);
-  useEffect(() => {
-    if (!profile || awSavedRef[0]) return;
-    const params = new URLSearchParams(window.location.search);
-    const aw = params.get('aw');
-    if (aw && !isNaN(Number(aw))) {
-      awSavedRef[1](true);
-      setProfile({ ...profile, appleWatchCalories: parseFloat(aw) });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }
-  }, [profile]);
+  async function handleSyncLoad() {
+    if (!syncInput.trim()) return;
+    setSyncMsg('読み込み中...');
+    const ok = await loadFromCloud(syncInput.trim());
+    setSyncMsg(ok ? '✓ データを読み込みました' : '✗ 同期コードが見つかりません');
+    setTimeout(() => setSyncMsg(''), 3000);
+  }
+
+  async function handleSyncSave() {
+    if (!syncInput.trim() || !profile) return;
+    setSyncCode(syncInput.trim());
+    await syncToCloud();
+    setSyncMsg('✓ クラウドに保存しました');
+    setTimeout(() => setSyncMsg(''), 3000);
+  }
 
   useEffect(() => {
     if (profile) {
@@ -304,6 +309,30 @@ function ProfileContent() {
         className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition disabled:opacity-50">
         {saved ? '✓ 保存しました' : '保存する'}
       </button>
+
+      {/* デバイス同期 */}
+      <div className="bg-white rounded-2xl p-6 mt-4 shadow-sm">
+        <h2 className="font-bold text-gray-800 mb-1">デバイス同期</h2>
+        <p className="text-xs text-gray-400 mb-4">同じ同期コードを複数デバイスで使うとデータが共有されます。Apple Watchショートカットにも使用します。</p>
+        <div className="flex gap-2 mb-2">
+          <input
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="同期コード（例: naoya123）"
+            value={syncInput}
+            onChange={e => setSyncInput(e.target.value)}
+          />
+          <button onClick={handleSyncSave} className="bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700">保存</button>
+          <button onClick={handleSyncLoad} className="bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">読込</button>
+        </div>
+        {syncCode && <p className="text-xs text-blue-600">現在の同期コード: <strong>{syncCode}</strong></p>}
+        {syncMsg && <p className="text-xs text-green-600 mt-1">{syncMsg}</p>}
+        {syncCode && (
+          <div className="mt-3 bg-gray-50 rounded-xl p-3">
+            <p className="text-xs text-gray-500 font-semibold mb-1">Apple Watch Shortcutsの最終URLに使うアドレス:</p>
+            <p className="text-xs text-blue-600 break-all">https://calorie-web-theta.vercel.app/api/apple-watch?calories=[合計]&code={syncCode}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

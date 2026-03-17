@@ -1,15 +1,39 @@
 import { NextRequest } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SECRET_KEY!
+);
 
 export async function GET(req: NextRequest) {
   const calories = req.nextUrl.searchParams.get('calories');
+  const code = req.nextUrl.searchParams.get('code');
+
   if (!calories || isNaN(Number(calories))) {
-    return new Response('<html><body><p>エラー: calories が必要です</p></body></html>', {
-      headers: { 'content-type': 'text/html; charset=utf-8' },
-    });
+    return new Response('エラー: calories が必要です', { status: 400 });
   }
 
   const kcal = Math.round(parseFloat(calories));
 
+  // sync_codeがあればSupabaseに直接保存（バックグラウンド連携）
+  if (code) {
+    const { data } = await supabase.from('user_data').select('profile').eq('sync_code', code).single();
+    if (data) {
+      const profile = { ...data.profile, appleWatchCalories: kcal };
+      await supabase.from('user_data').update({
+        profile,
+        apple_watch_calories: kcal,
+        updated_at: new Date().toISOString(),
+      }).eq('sync_code', code);
+    }
+    // バックグラウンド実行時はシンプルなレスポンスを返す
+    return new Response(JSON.stringify({ success: true, calories: kcal }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  // sync_codeなし: ブラウザ経由でlocalStorageに保存
   const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
