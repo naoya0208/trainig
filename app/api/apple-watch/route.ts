@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   }
   // クライアントサイドのlocalStorageに書き込めないため、
   // クッキーに一時保存してページ側で読み取る
-  const res = NextResponse.redirect(new URL(`/?aw=${calories}`, req.url));
+  const res = NextResponse.redirect(new URL(`/profile?aw=${calories}`, req.url));
   res.cookies.set('aw_calories', calories, { maxAge: 60 * 60 * 24, path: '/' });
   return res;
 }
