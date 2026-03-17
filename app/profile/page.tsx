@@ -35,8 +35,10 @@ function ProfileContent() {
 
   // Apple Watch自動保存: プロフィールが読み込まれた後に?awパラメータを処理
   useEffect(() => {
-    const aw = searchParams.get('aw');
-    if (aw && !isNaN(Number(aw)) && profile) {
+    if (!profile) return;
+    const params = new URLSearchParams(window.location.search);
+    const aw = params.get('aw');
+    if (aw && !isNaN(Number(aw))) {
       setProfile({ ...profile, appleWatchCalories: parseFloat(aw) });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
