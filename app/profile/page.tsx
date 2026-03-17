@@ -33,12 +33,14 @@ function ProfileContent() {
     hydrate();
   }, []);
 
-  // Apple Watch自動保存: プロフィールが読み込まれた後に?awパラメータを処理
+  // Apple Watch自動保存: プロフィール読み込み後に1回だけ実行
+  const awSavedRef = useState(false);
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || awSavedRef[0]) return;
     const params = new URLSearchParams(window.location.search);
     const aw = params.get('aw');
     if (aw && !isNaN(Number(aw))) {
+      awSavedRef[1](true);
       setProfile({ ...profile, appleWatchCalories: parseFloat(aw) });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

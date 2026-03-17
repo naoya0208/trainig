@@ -38,7 +38,8 @@ export default function Home() {
   const todayFood = foodEntries.filter(e => e.date === TODAY);
   const todayWork = workoutSessions.filter(s => s.date === TODAY);
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
-  const burned = todayWork.reduce((s, w) => s + w.burnedCalories, 0);
+  // Apple Watch使用中は筋トレカロリーをTDEEに含むためダブルカウントしない
+  const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);
   const net = consumed - burned;
   const remaining = Math.max(0, targetCalories - net);
   const pct = Math.min(100, Math.round((net / targetCalories) * 100));
@@ -112,7 +113,12 @@ export default function Home() {
         <p className="text-sm text-gray-400 mb-4">今日のカロリー</p>
         <div className="grid grid-cols-3 gap-2 mb-4 text-center">
           <div><p className="text-2xl font-bold">{net.toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">摂取</p></div>
-          <div><p className="text-2xl font-bold text-blue-500">{burned.toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">運動消費</p></div>
+          <div>
+            <p className="text-2xl font-bold text-blue-500">
+              {appleWatchActive ? profile.appleWatchCalories?.toLocaleString() : burned.toLocaleString()}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">{appleWatchActive ? '⌚ 総消費' : '運動消費'}</p>
+          </div>
           <div><p className="text-2xl font-bold">{targetCalories.toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">目標</p></div>
         </div>
         <div className="h-3 bg-gray-100 rounded-full overflow-hidden mb-2">
