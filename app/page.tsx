@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets } from '@/lib/calc';
+import { MICRO_DEFS, sumMicros } from '@/lib/micros';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -51,11 +52,7 @@ export default function Home() {
   const protein = todayFood.reduce((s, e) => s + e.protein, 0);
   const fat = todayFood.reduce((s, e) => s + e.fat, 0);
   const carbs = todayFood.reduce((s, e) => s + e.carbs, 0);
-  const fiber = todayFood.reduce((s, e) => s + (e.fiber ?? 0), 0);
-  const todayExtras = todayFood.reduce((acc, e) => {
-    if (e.extras) for (const [k, v] of Object.entries(e.extras)) acc[k] = Math.round(((acc[k] ?? 0) + v) * 10) / 10;
-    return acc;
-  }, {} as Record<string, number>);
+  const todayMicros = sumMicros(todayFood);
 
   async function getNutritionAdvice() {
     setLoadingNutrition(true);
@@ -247,24 +244,32 @@ export default function Home() {
           })}
           <p className="text-xs text-gray-300 mt-1">バーの縦線 = 推奨目標 / バー右端 = 上限</p>
 
-          {/* 微量栄養素 */}
-          {(fiber > 0 || Object.keys(todayExtras).length > 0) && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 mb-2">今日の微量栄養素</p>
-              <div className="flex flex-wrap gap-2">
-                {fiber > 0 && (
-                  <span className={`text-xs px-2 py-1 rounded-full font-semibold ${fiber >= nutritionTargets.fiber ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-500'}`}>
-                    食物繊維 {fiber.toFixed(1)}g / {nutritionTargets.fiber}g
-                  </span>
-                )}
-                {Object.entries(todayExtras).map(([k, v]) => (
-                  <span key={k} className="text-xs px-2 py-1 rounded-full bg-purple-50 text-purple-600 font-semibold">
-                    {k} {v}
-                  </span>
-                ))}
-              </div>
+          {/* 微量栄養素（常時9項目表示） */}
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs font-semibold text-gray-400 mb-2">微量栄養素</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MICRO_DEFS.map(d => {
+                const v = (todayMicros[d.key] as number) ?? 0;
+                const pct = d.isLimit
+                  ? Math.min(100, Math.round(v / d.target * 100))
+                  : Math.min(100, Math.round(v / d.target * 100));
+                const ok = d.isLimit ? v <= d.target : v >= d.target * 0.8;
+                const color = d.isLimit
+                  ? (v > d.target ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600')
+                  : (ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400');
+                return (
+                  <div key={d.key} className={`rounded-xl border px-2 py-1.5 ${color}`}>
+                    <p className="text-xs font-semibold truncate">{d.label}</p>
+                    <p className="text-sm font-bold">{v}<span className="text-xs font-normal ml-0.5">{d.unit}</span></p>
+                    <div className="h-1 bg-white/60 rounded-full mt-1 overflow-hidden">
+                      <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs opacity-60 mt-0.5">{d.isLimit ? '上限' : '目標'}{d.target}{d.unit}</p>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
 
         {/* AI栄養分析結果 */}

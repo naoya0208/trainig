@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useStore } from '@/lib/store';
 import { calcBMI, getBMIStatus, calcNutritionTargets } from '@/lib/calc';
+import { MICRO_DEFS, sumMicros } from '@/lib/micros';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
-// 不足栄養素への食品提案
 const NUTRIENT_FOODS: Record<string, string[]> = {
   'タンパク質':  ['鶏むね肉', '卵', 'さば', '豆腐', 'ギリシャヨーグルト', 'プロテイン'],
   '脂質':        ['アボカド', 'ナッツ', 'オリーブオイル', 'サーモン'],
@@ -18,17 +18,7 @@ const NUTRIENT_FOODS: Record<string, string[]> = {
   '鉄分':        ['ほうれん草', 'レバー', 'あさり', '牛赤身肉', '枝豆'],
   'カルシウム':  ['牛乳', 'チーズ', 'ヨーグルト', '小魚', '豆腐'],
   'ビタミンC':   ['ブロッコリー', 'ピーマン', 'レモン', 'いちご', 'キウイ'],
-};
-
-// 各栄養素の1日目標値（トグルで確認用）
-const NUTRIENT_TARGETS: Record<string, { value: number; unit: string; label: string }> = {
-  '食物繊維':    { value: 22,   unit: 'g',  label: '食物繊維' },
-  'ビタミンD':   { value: 8.5,  unit: 'μg', label: 'ビタミンD' },
-  'ビタミンB12': { value: 2.4,  unit: 'μg', label: 'ビタミンB12' },
-  'EPA+DHA':    { value: 2.0,  unit: 'g',  label: 'EPA+DHA' },
-  '鉄分':        { value: 7.5,  unit: 'mg', label: '鉄分' },
-  'カルシウム':  { value: 650,  unit: 'mg', label: 'カルシウム' },
-  'ビタミンC':   { value: 100,  unit: 'mg', label: 'ビタミンC' },
+  '亜鉛':        ['牡蠣', '牛肉', 'カシューナッツ', '卵', '豆腐'],
 };
 
 export default function WeightPage() {
@@ -59,18 +49,13 @@ export default function WeightPage() {
     }
     return days.map(date => {
       const entries = foodEntries.filter(e => e.date === date);
-      const extras = entries.reduce((acc, e) => {
-        if (e.extras) for (const [k, v] of Object.entries(e.extras)) acc[k] = ((acc[k] ?? 0) + v);
-        return acc;
-      }, {} as Record<string, number>);
       return {
         date,
         protein: Math.round(entries.reduce((s, e) => s + e.protein, 0) * 10) / 10,
         fat: Math.round(entries.reduce((s, e) => s + e.fat, 0) * 10) / 10,
         carbs: Math.round(entries.reduce((s, e) => s + e.carbs, 0) * 10) / 10,
-        fiber: Math.round(entries.reduce((s, e) => s + (e.fiber ?? 0), 0) * 10) / 10,
         calories: entries.reduce((s, e) => s + e.calories, 0),
-        extras,
+        micros: sumMicros(entries),
       };
     });
   })();
@@ -78,33 +63,26 @@ export default function WeightPage() {
   const recordedDays = past7.filter(d => d.calories > 0);
   const avg = recordedDays.length === 0 ? null : {
     protein: Math.round(recordedDays.reduce((s, d) => s + d.protein, 0) / recordedDays.length * 10) / 10,
-    fat: Math.round(recordedDays.reduce((s, d) => s + d.fat, 0) / recordedDays.length * 10) / 10,
-    carbs: Math.round(recordedDays.reduce((s, d) => s + d.carbs, 0) / recordedDays.length * 10) / 10,
-    fiber: Math.round(recordedDays.reduce((s, d) => s + d.fiber, 0) / recordedDays.length * 10) / 10,
-    extras: (() => {
-      const keys = new Set(recordedDays.flatMap(d => Object.keys(d.extras)));
+    fat:     Math.round(recordedDays.reduce((s, d) => s + d.fat,     0) / recordedDays.length * 10) / 10,
+    carbs:   Math.round(recordedDays.reduce((s, d) => s + d.carbs,   0) / recordedDays.length * 10) / 10,
+    micros: (() => {
       const result: Record<string, number> = {};
-      keys.forEach(k => {
-        result[k] = Math.round(recordedDays.reduce((s, d) => s + (d.extras[k] ?? 0), 0) / recordedDays.length * 10) / 10;
+      MICRO_DEFS.forEach(d => {
+        result[d.key] = Math.round(recordedDays.reduce((s, day) => s + ((day.micros[d.key] as number) ?? 0), 0) / recordedDays.length * 10) / 10;
       });
       return result;
     })(),
   };
 
-  // 不足栄養素を判定
-  const deficientNutrients: string[] = [];
+  // 不足栄養素（PFCとmicros両方チェック）
+  const deficient: { label: string; foods: string[] }[] = [];
   if (avg && nutritionTargets) {
-    if (avg.protein < nutritionTargets.protein * 0.8) deficientNutrients.push('タンパク質');
-    if (avg.fiber < 22 * 0.8) deficientNutrients.push('食物繊維');
-    Object.entries(NUTRIENT_TARGETS).forEach(([key, target]) => {
-      const val = avg.extras[key.includes('(') ? key : Object.keys(avg.extras).find(k => k.startsWith(key.split('(')[0])) ?? ''] ?? 0;
-      if (val > 0 && val < target.value * 0.8) deficientNutrients.push(key);
-    });
-    // extrasに存在するキーで目標の80%未満
-    Object.entries(avg.extras).forEach(([k, v]) => {
-      const targetKey = Object.keys(NUTRIENT_TARGETS).find(t => k.startsWith(t.split('(')[0]));
-      if (targetKey && v < NUTRIENT_TARGETS[targetKey].value * 0.8 && !deficientNutrients.includes(targetKey)) {
-        deficientNutrients.push(targetKey);
+    if (avg.protein < nutritionTargets.protein * 0.8) deficient.push({ label: 'タンパク質', foods: NUTRIENT_FOODS['タンパク質'] });
+    MICRO_DEFS.filter(d => !d.isLimit).forEach(d => {
+      const v = avg.micros[d.key] ?? 0;
+      if (v < d.target * 0.8) {
+        const foods = NUTRIENT_FOODS[d.label] ?? [];
+        deficient.push({ label: d.label, foods });
       }
     });
   }
@@ -117,16 +95,11 @@ export default function WeightPage() {
       <div className="bg-white rounded-2xl p-6 mb-5 shadow-sm">
         <p className="text-sm text-gray-400 mb-3">今日の体重</p>
         <div className="flex items-end gap-3 mb-5">
-          <input
-            className="text-5xl font-bold text-gray-900 w-40 border-b-2 border-blue-500 focus:outline-none bg-transparent pb-1"
-            type="number" step="0.1" value={input} onChange={e => setInput(e.target.value)}
-            placeholder="00.0"
-          />
+          <input className="text-5xl font-bold text-gray-900 w-40 border-b-2 border-blue-500 focus:outline-none bg-transparent pb-1"
+            type="number" step="0.1" value={input} onChange={e => setInput(e.target.value)} placeholder="00.0" />
           <span className="text-xl text-gray-400 pb-2">kg</span>
         </div>
-        <button onClick={handleSave} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">
-          記録する
-        </button>
+        <button onClick={handleSave} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">記録する</button>
       </div>
 
       {/* ステータス */}
@@ -178,67 +151,68 @@ export default function WeightPage() {
           {/* PFC平均 */}
           <div className="space-y-3 mb-4">
             {[
-              { label: 'タンパク質', avg: avg.protein, target: nutritionTargets.protein, unit: 'g', color: 'bg-blue-400', dot: 'text-blue-500' },
-              { label: '脂質',       avg: avg.fat,     target: nutritionTargets.fat,     unit: 'g', color: 'bg-yellow-400', dot: 'text-yellow-500' },
-              { label: '炭水化物',   avg: avg.carbs,   target: nutritionTargets.carbs,   unit: 'g', color: 'bg-green-400', dot: 'text-green-500' },
-              { label: '食物繊維',   avg: avg.fiber,   target: 22,                        unit: 'g', color: 'bg-orange-400', dot: 'text-orange-500' },
+              { label: 'タンパク質', avg: avg.protein, target: nutritionTargets.protein, unit: 'g', bar: 'bg-blue-400' },
+              { label: '脂質',       avg: avg.fat,     target: nutritionTargets.fat,     unit: 'g', bar: 'bg-yellow-400' },
+              { label: '炭水化物',   avg: avg.carbs,   target: nutritionTargets.carbs,   unit: 'g', bar: 'bg-green-400' },
             ].map(item => {
               const pct = Math.min(100, Math.round(item.avg / item.target * 100));
               const ok = pct >= 80;
               return (
                 <div key={item.label}>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className={`font-semibold ${item.dot}`}>{item.label}</span>
+                    <span className="font-semibold text-gray-600">{item.label}</span>
                     <span className={ok ? 'text-gray-500' : 'text-red-500 font-semibold'}>
-                      平均 {item.avg}{item.unit} / 目標 {item.target}{item.unit}
-                      {!ok && ' ⚠️不足'}
+                      平均 {item.avg}{item.unit} / 目標 {item.target}{item.unit}{!ok && ' ⚠️'}
                     </span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${ok ? item.color : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                    <div className={`h-full rounded-full ${ok ? item.bar : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* extras平均（あれば） */}
-          {Object.keys(avg.extras).length > 0 && (
-            <div className="border-t border-gray-100 pt-3">
-              <p className="text-xs font-semibold text-gray-400 mb-2">ビタミン・ミネラル（平均）</p>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(avg.extras).map(([k, v]) => {
-                  const targetKey = Object.keys(NUTRIENT_TARGETS).find(t => k.startsWith(t.split('(')[0]));
-                  const target = targetKey ? NUTRIENT_TARGETS[targetKey] : null;
-                  const ok = !target || v >= target.value * 0.8;
-                  return (
-                    <span key={k} className={`text-xs px-2 py-1 rounded-full font-semibold ${ok ? 'bg-purple-50 text-purple-600' : 'bg-red-50 text-red-500'}`}>
-                      {k} {v} {!ok && '⚠️'}
-                    </span>
-                  );
-                })}
-              </div>
+          {/* 微量栄養素9項目（常時表示） */}
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-400 mb-2">微量栄養素（7日平均）</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {MICRO_DEFS.map(d => {
+                const v = (avg.micros[d.key] as number) ?? 0;
+                const pct = Math.min(100, Math.round(v / d.target * 100));
+                const ok = d.isLimit ? v <= d.target : v >= d.target * 0.8;
+                const color = d.isLimit
+                  ? (v > d.target ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600')
+                  : (ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400');
+                return (
+                  <div key={d.key} className={`rounded-xl border px-2 py-1.5 ${color}`}>
+                    <p className="text-xs font-semibold truncate">{d.label}</p>
+                    <p className="text-sm font-bold">{v}<span className="text-xs font-normal ml-0.5">{d.unit}</span></p>
+                    <div className="h-1 bg-white/60 rounded-full mt-1 overflow-hidden">
+                      <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs opacity-60 mt-0.5">{d.isLimit ? '上限' : '目標'}{d.target}{d.unit}</p>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {/* 不足栄養素と食品提案 */}
-          {deficientNutrients.length > 0 && (
+          {deficient.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs font-semibold text-red-500 mb-3">⚠️ 不足しがちな栄養素と補給できる食品</p>
-              <div className="space-y-3">
-                {deficientNutrients.map(nutrient => {
-                  const foods = NUTRIENT_FOODS[nutrient] ?? [];
-                  return (
-                    <div key={nutrient} className="bg-red-50 rounded-xl p-3">
-                      <p className="text-xs font-bold text-red-600 mb-2">● {nutrient}が不足</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {foods.map(f => (
-                          <span key={f} className="text-xs bg-white border border-red-100 text-gray-700 px-2 py-1 rounded-full">{f}</span>
-                        ))}
-                      </div>
+              <div className="space-y-2">
+                {deficient.map(({ label, foods }) => (
+                  <div key={label} className="bg-red-50 rounded-xl p-3">
+                    <p className="text-xs font-bold text-red-600 mb-2">● {label}が不足</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {foods.map(f => (
+                        <span key={f} className="text-xs bg-white border border-red-100 text-gray-700 px-2 py-1 rounded-full">{f}</span>
+                      ))}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -1,37 +1,30 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useStore, FoodEntry, SavedFood } from '@/lib/store';
+import { useStore, FoodEntry, SavedFood, MicroNutrients } from '@/lib/store';
+import { MICRO_DEFS } from '@/lib/micros';
 
 const TODAY = new Date().toISOString().split('T')[0];
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
-interface Ingredient { name: string; grams: number; calories: number; protein: number; fat: number; carbs: number; fiber?: number; extras?: Record<string, number>; }
+
+interface Ingredient { name: string; grams: number; calories: number; protein: number; fat: number; carbs: number; micros?: MicroNutrients; }
 interface AIFood { name: string; note?: string; ingredients: Ingredient[]; }
+
+function scaleMicros(m: MicroNutrients | undefined, r: number): MicroNutrients | undefined {
+  if (!m) return undefined;
+  const s = (v?: number) => v != null ? Math.round(v * r * 10) / 10 : undefined;
+  return { fiber: s(m.fiber), vitaminD: s(m.vitaminD), vitaminB12: s(m.vitaminB12), vitaminC: s(m.vitaminC), iron: s(m.iron), calcium: s(m.calcium), zinc: s(m.zinc), omega3: s(m.omega3), sodium: s(m.sodium) };
+}
+
+function addMicros(a: MicroNutrients, b: MicroNutrients | undefined): MicroNutrients {
+  const add = (x?: number, y?: number) => x != null || y != null ? Math.round(((x ?? 0) + (y ?? 0)) * 10) / 10 : undefined;
+  return { fiber: add(a.fiber, b?.fiber), vitaminD: add(a.vitaminD, b?.vitaminD), vitaminB12: add(a.vitaminB12, b?.vitaminB12), vitaminC: add(a.vitaminC, b?.vitaminC), iron: add(a.iron, b?.iron), calcium: add(a.calcium, b?.calcium), zinc: add(a.zinc, b?.zinc), omega3: add(a.omega3, b?.omega3), sodium: add(a.sodium, b?.sodium) };
+}
 
 function scaleIngredient(ing: Ingredient, newGrams: number): Ingredient {
   if (ing.grams === 0) return { ...ing, grams: newGrams };
   const r = newGrams / ing.grams;
-  const extras = ing.extras
-    ? Object.fromEntries(Object.entries(ing.extras).map(([k, v]) => [k, Math.round(v * r * 10) / 10]))
-    : undefined;
-  return {
-    ...ing, grams: newGrams,
-    calories: Math.round(ing.calories * r),
-    protein: Math.round(ing.protein * r * 10) / 10,
-    fat: Math.round(ing.fat * r * 10) / 10,
-    carbs: Math.round(ing.carbs * r * 10) / 10,
-    fiber: ing.fiber != null ? Math.round(ing.fiber * r * 10) / 10 : undefined,
-    extras,
-  };
-}
-
-function mergeExtras(a: Record<string, number> | undefined, b: Record<string, number> | undefined): Record<string, number> | undefined {
-  if (!a && !b) return undefined;
-  const result: Record<string, number> = { ...(a ?? {}) };
-  for (const [k, v] of Object.entries(b ?? {})) {
-    result[k] = Math.round(((result[k] ?? 0) + v) * 10) / 10;
-  }
-  return result;
+  return { ...ing, grams: newGrams, calories: Math.round(ing.calories * r), protein: Math.round(ing.protein * r * 10) / 10, fat: Math.round(ing.fat * r * 10) / 10, carbs: Math.round(ing.carbs * r * 10) / 10, micros: scaleMicros(ing.micros, r) };
 }
 
 function sumIngredients(ings: Ingredient[]) {
@@ -40,10 +33,9 @@ function sumIngredients(ings: Ingredient[]) {
     protein: Math.round((acc.protein + i.protein) * 10) / 10,
     fat: Math.round((acc.fat + i.fat) * 10) / 10,
     carbs: Math.round((acc.carbs + i.carbs) * 10) / 10,
-    fiber: Math.round(((acc.fiber ?? 0) + (i.fiber ?? 0)) * 10) / 10,
     grams: acc.grams + i.grams,
-    extras: mergeExtras(acc.extras, i.extras),
-  }), { calories: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, grams: 0, extras: undefined as Record<string, number> | undefined });
+    micros: addMicros(acc.micros, i.micros),
+  }), { calories: 0, protein: 0, fat: 0, carbs: 0, grams: 0, micros: {} as MicroNutrients });
 }
 
 // g入力：onBlurで確定、途中で空文字を許容
@@ -133,10 +125,11 @@ function EditableFoodCard({ food, meal, onAdd }: {
         <span className="text-blue-600 font-semibold">P {totals.protein}g</span>
         <span className="text-yellow-600 font-semibold">F {totals.fat}g</span>
         <span className="text-green-600 font-semibold">C {totals.carbs}g</span>
-        {totals.fiber > 0 && <span className="text-orange-500 font-semibold">食物繊維 {totals.fiber}g</span>}
-        {totals.extras && Object.entries(totals.extras).map(([k, v]) => (
-          <span key={k} className="text-purple-500 font-semibold">{k} {v}</span>
-        ))}
+        {MICRO_DEFS.map(d => {
+          const v = totals.micros?.[d.key] ?? 0;
+          if (v <= 0) return null;
+          return <span key={d.key} className="text-purple-500 font-semibold">{d.label} {v}{d.unit}</span>;
+        })}
       </div>
 
       <button onClick={() => onAdd(food, ingredients)}
@@ -254,10 +247,11 @@ function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
         <span>P {entry.protein}g</span>
         <span>F {entry.fat}g</span>
         <span>C {entry.carbs}g</span>
-        {entry.fiber != null && entry.fiber > 0 && <span className="text-orange-400">食物繊維 {entry.fiber}g</span>}
-        {entry.extras && Object.entries(entry.extras).map(([k, v]) => (
-          <span key={k} className="text-purple-400">{k} {v}</span>
-        ))}
+        {MICRO_DEFS.map(d => {
+          const v = entry.micros?.[d.key] ?? (d.key === 'fiber' ? entry.fiber : undefined) ?? 0;
+          if (v <= 0) return null;
+          return <span key={d.key} className="text-purple-400">{d.label} {v}{d.unit}</span>;
+        })}
       </div>
     </div>
   );
@@ -315,8 +309,8 @@ export default function FoodPage() {
       id: Date.now().toString(), date: TODAY, time: eatTime, meal,
       foodName: food.name, grams: totals.grams,
       calories: totals.calories, protein: totals.protein,
-      fat: totals.fat, carbs: totals.carbs, fiber: totals.fiber > 0 ? totals.fiber : undefined,
-      extras: totals.extras,
+      fat: totals.fat, carbs: totals.carbs,
+      micros: totals.micros,
     };
     addFood(entry);
     const per100g = totals.grams > 0 ? {

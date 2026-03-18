@@ -3,6 +3,18 @@ import { create } from 'zustand';
 import { Profile } from './calc';
 import { supabase } from './supabase';
 
+export interface MicroNutrients {
+  fiber?: number;      // 食物繊維 g
+  vitaminD?: number;   // ビタミンD μg
+  vitaminB12?: number; // ビタミンB12 μg
+  vitaminC?: number;   // ビタミンC mg
+  iron?: number;       // 鉄分 mg
+  calcium?: number;    // カルシウム mg
+  zinc?: number;       // 亜鉛 mg
+  omega3?: number;     // EPA+DHA g
+  sodium?: number;     // ナトリウム mg
+}
+
 export interface FoodEntry {
   id: string;
   date: string;
@@ -14,8 +26,9 @@ export interface FoodEntry {
   protein: number;
   fat: number;
   carbs: number;
-  fiber?: number;
-  extras?: Record<string, number>; // ビタミン・ミネラル等（単位はGeminiが決定）
+  fiber?: number;   // 後方互換用（新規はmicros.fiberを使用）
+  extras?: Record<string, number>; // 後方互換用
+  micros?: MicroNutrients;
 }
 
 export interface SavedFood {
