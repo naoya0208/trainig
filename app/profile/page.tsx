@@ -301,7 +301,9 @@ function ProfileContent() {
               {ti.daysLeft && <p className="text-xs text-blue-500">週{ti.weeklyChange > 0 ? '+' : ''}{ti.weeklyChange.toFixed(2)}kg</p>}
             </div>
           </div>
-          {ti.isUnsafe && <p className="text-xs text-yellow-700 bg-yellow-50 rounded-lg p-2 mt-3">⚠️ ペースが速すぎます。目標日を延長してください。</p>}
+          {ti.isGoalMismatch && <p className="text-xs text-red-700 bg-red-50 rounded-lg p-2 mt-3">⚠️ 目標体重と目標の種類が一致していません。減量なら目標体重を現在の体重より低く設定してください。</p>}
+          {ti.isMinCal && <p className="text-xs text-orange-700 bg-orange-50 rounded-lg p-2 mt-3">⚠️ 計算結果が最低カロリー下限（{preview?.gender === 'female' ? '1,200' : '1,500'}kcal）を下回るため、下限値を適用しています。目標日を延長してください。</p>}
+          {ti.isUnsafe && !ti.isMinCal && <p className="text-xs text-yellow-700 bg-yellow-50 rounded-lg p-2 mt-3">⚠️ ペースが速すぎます（週1kg超）。週1kgに制限して計算しています。目標日を延長してください。</p>}
         </div>
       )}
 

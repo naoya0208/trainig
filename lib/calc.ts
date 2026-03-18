@@ -40,19 +40,29 @@ export function calcTargetCalories(p: Profile): {
   weeklyChange: number;
   daysLeft: number | null;
   isUnsafe: boolean;
+  isMinCal: boolean;
+  isGoalMismatch: boolean; // 目標と体重の方向が逆
 } {
   const tdee = calcTDEE(p);
   const minCal = p.gender === 'female' ? 1200 : 1500;
   if (p.goalType === 'maintain' || !p.targetDate) {
-    return { targetCalories: tdee, weeklyChange: 0, daysLeft: null, isUnsafe: false };
+    return { targetCalories: tdee, weeklyChange: 0, daysLeft: null, isUnsafe: false, isMinCal: false, isGoalMismatch: false };
+  }
+  // 目標と体重の方向チェック
+  const isGoalMismatch =
+    (p.goalType === 'lose' && p.targetWeight >= p.weight) ||
+    (p.goalType === 'gain' && p.targetWeight <= p.weight);
+  if (isGoalMismatch) {
+    return { targetCalories: tdee, weeklyChange: 0, daysLeft: null, isUnsafe: false, isMinCal: false, isGoalMismatch: true };
   }
   const daysLeft = Math.max(1, Math.round((new Date(p.targetDate).getTime() - Date.now()) / 86400000));
   const weeklyChange = (p.targetWeight - p.weight) / (daysLeft / 7);
   const isUnsafe = Math.abs(weeklyChange) > 1.0;
   const safe = isUnsafe ? Math.sign(weeklyChange) * 1.0 : weeklyChange;
   let targetCalories = Math.round(tdee + (safe * 7200) / 7);
-  if (targetCalories < minCal) targetCalories = minCal;
-  return { targetCalories, weeklyChange: safe, daysLeft, isUnsafe };
+  const isMinCal = targetCalories < minCal;
+  if (isMinCal) targetCalories = minCal;
+  return { targetCalories, weeklyChange: safe, daysLeft, isUnsafe, isMinCal, isGoalMismatch: false };
 }
 
 export interface CalorieLimits {
