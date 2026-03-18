@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   if (!query) return NextResponse.json({ error: 'query required' }, { status: 400 });
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const prompt = `
 あなたは栄養士AIです。以下の食品・料理について栄養情報をJSON形式で返してください。
 
