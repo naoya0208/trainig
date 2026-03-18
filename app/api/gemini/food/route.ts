@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
         "calories": カロリー（kcal, 数値）,
         "protein": タンパク質（g, 数値）,
         "fat": 脂質（g, 数値）,
-        "carbs": 炭水化物（g, 数値）
+        "carbs": 炭水化物（g, 数値）,
+        "fiber": 食物繊維（g, 数値）
       }
     ]
   }

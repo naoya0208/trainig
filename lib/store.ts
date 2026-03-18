@@ -14,6 +14,7 @@ export interface FoodEntry {
   protein: number;
   fat: number;
   carbs: number;
+  fiber?: number;
 }
 
 export interface SavedFood {
@@ -54,6 +55,7 @@ interface Store {
   setProfile: (p: Profile) => void;
   addFood: (e: FoodEntry) => void;
   removeFood: (id: string) => void;
+  updateFood: (id: string, updates: Partial<FoodEntry>) => void;
   addWeight: (e: WeightEntry) => void;
   addWorkout: (s: WorkoutSession) => void;
   removeWorkout: (id: string) => void;
@@ -94,6 +96,10 @@ export const useStore = create<Store>((set, get) => ({
   },
   removeFood: (id) => {
     const next = get().foodEntries.filter(e => e.id !== id);
+    set({ foodEntries: next }); save(KEYS.food, next); get().syncToCloud();
+  },
+  updateFood: (id, updates) => {
+    const next = get().foodEntries.map(e => e.id === id ? { ...e, ...updates } : e);
     set({ foodEntries: next }); save(KEYS.food, next); get().syncToCloud();
   },
   addWeight: (e) => {
