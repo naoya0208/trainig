@@ -2,12 +2,37 @@
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useStore } from '@/lib/store';
-import { calcBMI, getBMIStatus } from '@/lib/calc';
+import { calcBMI, getBMIStatus, calcNutritionTargets } from '@/lib/calc';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
+// 不足栄養素への食品提案
+const NUTRIENT_FOODS: Record<string, string[]> = {
+  'タンパク質':  ['鶏むね肉', '卵', 'さば', '豆腐', 'ギリシャヨーグルト', 'プロテイン'],
+  '脂質':        ['アボカド', 'ナッツ', 'オリーブオイル', 'サーモン'],
+  '炭水化物':    ['玄米', 'オートミール', 'さつまいも', 'バナナ'],
+  '食物繊維':    ['ブロッコリー', 'きのこ', '玄米', '豆類', 'さつまいも', 'アボカド'],
+  'ビタミンD':   ['さば', 'いわし', 'サーモン', '卵黄', 'きのこ（干し）'],
+  'ビタミンB12': ['さば', 'いわし', '貝類', '牛肉', 'チーズ'],
+  'EPA+DHA':    ['さば', 'いわし', 'サーモン', 'まぐろ（脂身）', 'さんま'],
+  '鉄分':        ['ほうれん草', 'レバー', 'あさり', '牛赤身肉', '枝豆'],
+  'カルシウム':  ['牛乳', 'チーズ', 'ヨーグルト', '小魚', '豆腐'],
+  'ビタミンC':   ['ブロッコリー', 'ピーマン', 'レモン', 'いちご', 'キウイ'],
+};
+
+// 各栄養素の1日目標値（トグルで確認用）
+const NUTRIENT_TARGETS: Record<string, { value: number; unit: string; label: string }> = {
+  '食物繊維':    { value: 22,   unit: 'g',  label: '食物繊維' },
+  'ビタミンD':   { value: 8.5,  unit: 'μg', label: 'ビタミンD' },
+  'ビタミンB12': { value: 2.4,  unit: 'μg', label: 'ビタミンB12' },
+  'EPA+DHA':    { value: 2.0,  unit: 'g',  label: 'EPA+DHA' },
+  '鉄分':        { value: 7.5,  unit: 'mg', label: '鉄分' },
+  'カルシウム':  { value: 650,  unit: 'mg', label: 'カルシウム' },
+  'ビタミンC':   { value: 100,  unit: 'mg', label: 'ビタミンC' },
+};
+
 export default function WeightPage() {
-  const { profile, weightEntries, addWeight, setProfile, hydrate } = useStore();
+  const { profile, weightEntries, foodEntries, addWeight, setProfile, hydrate } = useStore();
   const [input, setInput] = useState('');
 
   useEffect(() => { hydrate(); if (profile) setInput(profile.weight.toString()); }, []);
@@ -23,6 +48,66 @@ export default function WeightPage() {
   const bmi = profile ? calcBMI(profile.weight, profile.height) : null;
   const bmiStatus = bmi ? getBMIStatus(bmi) : null;
   const diff = profile ? parseFloat((profile.weight - profile.targetWeight).toFixed(1)) : null;
+  const nutritionTargets = profile ? calcNutritionTargets(profile) : null;
+
+  // 過去7日間の栄養習慣集計
+  const past7 = (() => {
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      days.push(d.toISOString().split('T')[0]);
+    }
+    return days.map(date => {
+      const entries = foodEntries.filter(e => e.date === date);
+      const extras = entries.reduce((acc, e) => {
+        if (e.extras) for (const [k, v] of Object.entries(e.extras)) acc[k] = ((acc[k] ?? 0) + v);
+        return acc;
+      }, {} as Record<string, number>);
+      return {
+        date,
+        protein: Math.round(entries.reduce((s, e) => s + e.protein, 0) * 10) / 10,
+        fat: Math.round(entries.reduce((s, e) => s + e.fat, 0) * 10) / 10,
+        carbs: Math.round(entries.reduce((s, e) => s + e.carbs, 0) * 10) / 10,
+        fiber: Math.round(entries.reduce((s, e) => s + (e.fiber ?? 0), 0) * 10) / 10,
+        calories: entries.reduce((s, e) => s + e.calories, 0),
+        extras,
+      };
+    });
+  })();
+
+  const recordedDays = past7.filter(d => d.calories > 0);
+  const avg = recordedDays.length === 0 ? null : {
+    protein: Math.round(recordedDays.reduce((s, d) => s + d.protein, 0) / recordedDays.length * 10) / 10,
+    fat: Math.round(recordedDays.reduce((s, d) => s + d.fat, 0) / recordedDays.length * 10) / 10,
+    carbs: Math.round(recordedDays.reduce((s, d) => s + d.carbs, 0) / recordedDays.length * 10) / 10,
+    fiber: Math.round(recordedDays.reduce((s, d) => s + d.fiber, 0) / recordedDays.length * 10) / 10,
+    extras: (() => {
+      const keys = new Set(recordedDays.flatMap(d => Object.keys(d.extras)));
+      const result: Record<string, number> = {};
+      keys.forEach(k => {
+        result[k] = Math.round(recordedDays.reduce((s, d) => s + (d.extras[k] ?? 0), 0) / recordedDays.length * 10) / 10;
+      });
+      return result;
+    })(),
+  };
+
+  // 不足栄養素を判定
+  const deficientNutrients: string[] = [];
+  if (avg && nutritionTargets) {
+    if (avg.protein < nutritionTargets.protein * 0.8) deficientNutrients.push('タンパク質');
+    if (avg.fiber < 22 * 0.8) deficientNutrients.push('食物繊維');
+    Object.entries(NUTRIENT_TARGETS).forEach(([key, target]) => {
+      const val = avg.extras[key.includes('(') ? key : Object.keys(avg.extras).find(k => k.startsWith(key.split('(')[0])) ?? ''] ?? 0;
+      if (val > 0 && val < target.value * 0.8) deficientNutrients.push(key);
+    });
+    // extrasに存在するキーで目標の80%未満
+    Object.entries(avg.extras).forEach(([k, v]) => {
+      const targetKey = Object.keys(NUTRIENT_TARGETS).find(t => k.startsWith(t.split('(')[0]));
+      if (targetKey && v < NUTRIENT_TARGETS[targetKey].value * 0.8 && !deficientNutrients.includes(targetKey)) {
+        deficientNutrients.push(targetKey);
+      }
+    });
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto">
@@ -83,6 +168,82 @@ export default function WeightPage() {
           <p className="text-center text-gray-300 py-10">2日分以上の記録でグラフが表示されます</p>
         )}
       </div>
+
+      {/* 栄養素の習慣（過去7日） */}
+      {avg && nutritionTargets && (
+        <div className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
+          <p className="text-sm font-semibold text-gray-500 mb-1">栄養素の習慣（過去7日平均）</p>
+          <p className="text-xs text-gray-300 mb-4">{recordedDays.length}日分の記録から算出</p>
+
+          {/* PFC平均 */}
+          <div className="space-y-3 mb-4">
+            {[
+              { label: 'タンパク質', avg: avg.protein, target: nutritionTargets.protein, unit: 'g', color: 'bg-blue-400', dot: 'text-blue-500' },
+              { label: '脂質',       avg: avg.fat,     target: nutritionTargets.fat,     unit: 'g', color: 'bg-yellow-400', dot: 'text-yellow-500' },
+              { label: '炭水化物',   avg: avg.carbs,   target: nutritionTargets.carbs,   unit: 'g', color: 'bg-green-400', dot: 'text-green-500' },
+              { label: '食物繊維',   avg: avg.fiber,   target: 22,                        unit: 'g', color: 'bg-orange-400', dot: 'text-orange-500' },
+            ].map(item => {
+              const pct = Math.min(100, Math.round(item.avg / item.target * 100));
+              const ok = pct >= 80;
+              return (
+                <div key={item.label}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className={`font-semibold ${item.dot}`}>{item.label}</span>
+                    <span className={ok ? 'text-gray-500' : 'text-red-500 font-semibold'}>
+                      平均 {item.avg}{item.unit} / 目標 {item.target}{item.unit}
+                      {!ok && ' ⚠️不足'}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${ok ? item.color : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* extras平均（あれば） */}
+          {Object.keys(avg.extras).length > 0 && (
+            <div className="border-t border-gray-100 pt-3">
+              <p className="text-xs font-semibold text-gray-400 mb-2">ビタミン・ミネラル（平均）</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(avg.extras).map(([k, v]) => {
+                  const targetKey = Object.keys(NUTRIENT_TARGETS).find(t => k.startsWith(t.split('(')[0]));
+                  const target = targetKey ? NUTRIENT_TARGETS[targetKey] : null;
+                  const ok = !target || v >= target.value * 0.8;
+                  return (
+                    <span key={k} className={`text-xs px-2 py-1 rounded-full font-semibold ${ok ? 'bg-purple-50 text-purple-600' : 'bg-red-50 text-red-500'}`}>
+                      {k} {v} {!ok && '⚠️'}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 不足栄養素と食品提案 */}
+          {deficientNutrients.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs font-semibold text-red-500 mb-3">⚠️ 不足しがちな栄養素と補給できる食品</p>
+              <div className="space-y-3">
+                {deficientNutrients.map(nutrient => {
+                  const foods = NUTRIENT_FOODS[nutrient] ?? [];
+                  return (
+                    <div key={nutrient} className="bg-red-50 rounded-xl p-3">
+                      <p className="text-xs font-bold text-red-600 mb-2">● {nutrient}が不足</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {foods.map(f => (
+                          <span key={f} className="text-xs bg-white border border-red-100 text-gray-700 px-2 py-1 rounded-full">{f}</span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 履歴 */}
       <div className="bg-white rounded-2xl p-5 shadow-sm">

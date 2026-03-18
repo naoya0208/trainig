@@ -51,6 +51,11 @@ export default function Home() {
   const protein = todayFood.reduce((s, e) => s + e.protein, 0);
   const fat = todayFood.reduce((s, e) => s + e.fat, 0);
   const carbs = todayFood.reduce((s, e) => s + e.carbs, 0);
+  const fiber = todayFood.reduce((s, e) => s + (e.fiber ?? 0), 0);
+  const todayExtras = todayFood.reduce((acc, e) => {
+    if (e.extras) for (const [k, v] of Object.entries(e.extras)) acc[k] = Math.round(((acc[k] ?? 0) + v) * 10) / 10;
+    return acc;
+  }, {} as Record<string, number>);
 
   async function getNutritionAdvice() {
     setLoadingNutrition(true);
@@ -241,6 +246,25 @@ export default function Home() {
             );
           })}
           <p className="text-xs text-gray-300 mt-1">バーの縦線 = 推奨目標 / バー右端 = 上限</p>
+
+          {/* 微量栄養素 */}
+          {(fiber > 0 || Object.keys(todayExtras).length > 0) && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-400 mb-2">今日の微量栄養素</p>
+              <div className="flex flex-wrap gap-2">
+                {fiber > 0 && (
+                  <span className={`text-xs px-2 py-1 rounded-full font-semibold ${fiber >= nutritionTargets.fiber ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-500'}`}>
+                    食物繊維 {fiber.toFixed(1)}g / {nutritionTargets.fiber}g
+                  </span>
+                )}
+                {Object.entries(todayExtras).map(([k, v]) => (
+                  <span key={k} className="text-xs px-2 py-1 rounded-full bg-purple-50 text-purple-600 font-semibold">
+                    {k} {v}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* AI栄養分析結果 */}
