@@ -350,7 +350,9 @@ export default function FoodPage() {
 
   function handleAddSaved(saved: SavedFood, grams: number) {
     const n = calcNutrition(saved.per100g, grams);
-    addFood({ id: Date.now().toString(), date: eatDate, time: eatTime, meal, foodName: saved.foodName, grams, ...n });
+    const micros = calcFoodMicros(saved, grams);
+    const microsField = Object.values(micros).some(v => v != null && v !== 0) ? micros : undefined;
+    addFood({ id: Date.now().toString(), date: eatDate, time: eatTime, meal, foodName: saved.foodName, grams, ...n, micros: microsField });
     saveFoodToHistory({ ...saved, grams, lastUsed: eatDate, useCount: saved.useCount + 1 });
   }
 
