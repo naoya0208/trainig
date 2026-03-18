@@ -5,16 +5,25 @@ import { useStore } from '@/lib/store';
 import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets } from '@/lib/calc';
 import { MICRO_DEFS, sumMicros } from '@/lib/micros';
 
-const TODAY = new Date().toISOString().split('T')[0];
+function getToday() { return new Date().toISOString().split('T')[0]; }
 
 export default function Home() {
   const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate } = useStore();
+  const [today, setToday] = useState(getToday);
   const [advice, setAdvice] = useState<{ status: string; message: string; tips: string[] } | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [nutritionAdvice, setNutritionAdvice] = useState<{ deficiencies: any[]; timing: any[]; overall: string } | null>(null);
   const [loadingNutrition, setLoadingNutrition] = useState(false);
 
-  useEffect(() => { hydrate(); }, []);
+  useEffect(() => {
+    hydrate();
+    // 1分ごとに日付チェック → 0時を跨いだら自動更新
+    const timer = setInterval(() => {
+      const now = getToday();
+      setToday(prev => prev !== now ? now : prev);
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (!profile) {
     return (
@@ -40,8 +49,8 @@ export default function Home() {
   const limits = calcCalorieLimits(profile);
   const nutritionTargets = calcNutritionTargets(profile);
 
-  const todayFood = foodEntries.filter(e => e.date === TODAY);
-  const todayWork = workoutSessions.filter(s => s.date === TODAY);
+  const todayFood = foodEntries.filter(e => e.date === today);
+  const todayWork = workoutSessions.filter(s => s.date === today);
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
   // Apple Watch使用中は筋トレカロリーをTDEEに含むためダブルカウントしない
   const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);

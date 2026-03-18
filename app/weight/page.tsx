@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { calcBMI, getBMIStatus, calcNutritionTargets } from '@/lib/calc';
 import { MICRO_DEFS, sumMicros } from '@/lib/micros';
 
-const TODAY = new Date().toISOString().split('T')[0];
+function getToday() { return new Date().toISOString().split('T')[0]; }
 
 const NUTRIENT_FOODS: Record<string, string[]> = {
   'タンパク質':  ['鶏むね肉', '卵', 'さば', '豆腐', 'ギリシャヨーグルト', 'プロテイン'],
@@ -24,13 +24,22 @@ const NUTRIENT_FOODS: Record<string, string[]> = {
 export default function WeightPage() {
   const { profile, weightEntries, foodEntries, addWeight, setProfile, hydrate } = useStore();
   const [input, setInput] = useState('');
+  const [today, setToday] = useState(getToday);
 
-  useEffect(() => { hydrate(); if (profile) setInput(profile.weight.toString()); }, []);
+  useEffect(() => {
+    hydrate();
+    if (profile) setInput(profile.weight.toString());
+    const timer = setInterval(() => {
+      const now = getToday();
+      setToday(prev => prev !== now ? now : prev);
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   function handleSave() {
     const w = parseFloat(input);
     if (isNaN(w) || w < 20 || w > 300) return;
-    addWeight({ date: TODAY, weight: w });
+    addWeight({ date: today, weight: w });
     if (profile) setProfile({ ...profile, weight: w });
   }
 
