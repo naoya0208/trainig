@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { Profile, ActivityLevel, GoalType, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight } from '@/lib/calc';
+import { localDate } from '@/lib/date';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
   { value: 1.2,   label: 'ほぼ非活動的', desc: 'デスクワーク・ほぼ運動なし' },
@@ -283,7 +284,7 @@ function ProfileContent() {
           <div>
             <label className="text-sm font-semibold text-gray-600 block mb-2">目標達成日</label>
             <input type="date" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              min={new Date().toISOString().split('T')[0]}
+              min={localDate()}
               value={targetDate} onChange={e => setTargetDate(e.target.value)} />
           </div>
         )}

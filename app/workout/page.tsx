@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useStore, WorkoutSession, WorkoutExercise } from '@/lib/store';
 
-const TODAY = new Date().toISOString().split('T')[0];
+import { localDate } from '@/lib/date';
+const TODAY = localDate();
 const EXERCISES = [
   { name: 'ベンチプレス', part: '胸', met: 6 }, { name: 'ダンベルフライ', part: '胸', met: 5 }, { name: 'プッシュアップ', part: '胸', met: 5 }, { name: 'インクラインベンチプレス', part: '胸', met: 6 },
   { name: 'デッドリフト', part: '背中', met: 8 }, { name: 'ラットプルダウン', part: '背中', met: 6 }, { name: '懸垂', part: '背中', met: 6 }, { name: 'ベントオーバーロウ', part: '背中', met: 6 }, { name: 'シーテッドロウ', part: '背中', met: 6 },

@@ -5,8 +5,9 @@ import { MICRO_DEFS } from '@/lib/micros';
 
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function tomorrowStr() { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; }
+import { localDate, localDateOffset } from '@/lib/date';
+function todayStr() { return localDate(); }
+function tomorrowStr() { return localDateOffset(1); }
 
 interface Ingredient { name: string; grams: number; calories: number; protein: number; fat: number; carbs: number; micros?: MicroNutrients; servingUnit?: string; }
 interface AIFood { name: string; note?: string; ingredients: Ingredient[]; }

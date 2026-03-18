@@ -5,7 +5,8 @@ import { useStore } from '@/lib/store';
 import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets } from '@/lib/calc';
 import { MICRO_DEFS, sumMicros } from '@/lib/micros';
 
-function getToday() { return new Date().toISOString().split('T')[0]; }
+import { localDate } from '@/lib/date';
+function getToday() { return localDate(); }
 
 export default function Home() {
   const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate } = useStore();

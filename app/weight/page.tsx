@@ -5,7 +5,8 @@ import { useStore } from '@/lib/store';
 import { calcBMI, getBMIStatus, calcNutritionTargets } from '@/lib/calc';
 import { MICRO_DEFS, sumMicros } from '@/lib/micros';
 
-function getToday() { return new Date().toISOString().split('T')[0]; }
+import { localDate } from '@/lib/date';
+function getToday() { return localDate(); }
 
 const NUTRIENT_FOODS: Record<string, string[]> = {
   'タンパク質':  ['鶏むね肉', '卵', 'さば', '豆腐', 'ギリシャヨーグルト', 'プロテイン'],
@@ -54,7 +55,7 @@ export default function WeightPage() {
     const days: string[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      days.push(d.toISOString().split('T')[0]);
+      days.push(localDate(d));
     }
     return days.map(date => {
       const entries = foodEntries.filter(e => e.date === date);
