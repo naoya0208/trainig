@@ -409,7 +409,7 @@ export default function FoodPage() {
     try {
       const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, mode: searchMode }) });
       const data = await res.json();
-      if (data.foods) setResults(data.foods);
+      if (data.foods) { setResults(data.foods); if (data.usedSearch) setError(''); }
       else setError('取得に失敗しました');
     } catch { setError('エラーが発生しました'); }
     finally { setLoading(false); }

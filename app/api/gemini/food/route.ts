@@ -44,12 +44,13 @@ export async function POST(req: NextRequest) {
 ]
 
 ルール:
+- **ブランド名・企業名・製品名が含まれる場合は、その製品の公式栄養成分表示に基づいた正確な値を返すこと**（推定ではなく実際の製品値を優先）
 - 料理は具材に分解して記載（例: ラーメン→麺・スープ・チャーシュー・ネギ・卵など）
 - シンプルな食品（バナナ・卵など）は具材1つでOK
 - グラムが明示されていない場合は一般的な1食分を推定
 - 複数の料理が含まれる場合は配列に複数追加
 - 数値は整数または小数点1桁
-- microsの各値は推定値でよい。含まれない場合は0
+- microsの各値は可能な限り正確に。不明な場合は0
 `;
 
   const supplementPrompt = `
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest) {
 ]
 
 ルール:
+- **ブランド名・企業名・製品名が含まれる場合は、その製品の公式栄養成分表示に基づいた正確な値を返すこと**
 - **1粒（1単位）あたり**の栄養値を返すこと（ユーザーがUI上で粒数を変更してスケールするため）
 - servingUnitは「粒」「錠」「包」「スクープ」「カプセル」「ソフトジェル」から最適なものを選ぶ
 - 複合サプリでも基本は ingredients 1要素でOK（カロリー源になる成分は分けてもよい）
@@ -97,16 +99,46 @@ export async function POST(req: NextRequest) {
 - 複数の商品バリエーションが考えられる場合は配列に複数追加
 `;
 
+  // ブランド名・企業名・製品固有情報が含まれる場合はGoogle検索グラウンディングを使用
+  function looksLikeBrandedProduct(q: string) {
+    // 片仮名ブランド名、社名っぽい語、数値+単位の組み合わせなど
+    const katakana = /[\u30A0-\u30FF]{3,}/; // カタカナ3文字以上
+    const companyLike = /(株|co\.|ltd|inc|明治|森永|大塚|ネスレ|ビーレジェンド|ザバス|DNS|マイプロテイン|オプティマム|ナウフーズ|DHC|ファンケル|アサヒ|カルビー|日清|サントリー|味の素)/i;
+    const specificProduct = /\d+(g|ml|mg|kcal|スクープ|粒|錠|包|本|個|枚|切)/;
+    return katakana.test(q) || companyLike.test(q) || specificProduct.test(q);
+  }
+
+  const useSearch = looksLikeBrandedProduct(query);
+
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const modelConfig: Parameters<typeof genAI.getGenerativeModel>[0] = {
+      model: 'gemini-2.5-flash',
+      ...(useSearch ? { tools: [{ googleSearch: {} } as any] } : {}),
+    };
+    const model = genAI.getGenerativeModel(modelConfig);
     const prompt = isSupplement ? supplementPrompt : foodPrompt;
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
     const foods = JSON.parse(jsonMatch[0]);
-    return NextResponse.json({ foods });
+    return NextResponse.json({ foods, usedSearch: useSearch });
   } catch (e: any) {
+    // 検索グラウンディング失敗時はフォールバック
+    if (useSearch) {
+      try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const prompt = isSupplement ? supplementPrompt : foodPrompt;
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
+        const foods = JSON.parse(jsonMatch[0]);
+        return NextResponse.json({ foods, usedSearch: false });
+      } catch (e2: any) {
+        return NextResponse.json({ error: 'Gemini API error', detail: e2?.message }, { status: 500 });
+      }
+    }
     console.error(e);
     return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
   }
