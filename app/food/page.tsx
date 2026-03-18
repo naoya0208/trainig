@@ -317,23 +317,46 @@ export default function FoodPage() {
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <p className="text-sm font-semibold text-gray-500 mb-3">今日の記録</p>
           <div className="space-y-2">
-            {todayEntries.map(e => (
-              <div key={e.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  e.meal === 'breakfast' ? 'bg-orange-100 text-orange-600' :
-                  e.meal === 'lunch' ? 'bg-green-100 text-green-600' :
-                  e.meal === 'dinner' ? 'bg-blue-100 text-blue-600' :
-                  'bg-purple-100 text-purple-600'}`}>
-                  {MEAL_LABELS[e.meal]}
-                </span>
-                <span className="flex-1 text-sm text-gray-700">
-                  {e.time && <span className="text-xs text-gray-400 mr-1">{e.time}</span>}
-                  {e.foodName}（{e.grams}g）
-                </span>
-                <span className="text-sm font-semibold">{e.calories}kcal</span>
-                <button onClick={() => removeFood(e.id)} className="text-gray-300 hover:text-red-400 transition">✕</button>
-              </div>
-            ))}
+            {todayEntries.map(e => {
+              const isFav = savedFoods.some(f => f.foodName === e.foodName && f.isFavorite);
+              return (
+                <div key={e.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    e.meal === 'breakfast' ? 'bg-orange-100 text-orange-600' :
+                    e.meal === 'lunch' ? 'bg-green-100 text-green-600' :
+                    e.meal === 'dinner' ? 'bg-blue-100 text-blue-600' :
+                    'bg-purple-100 text-purple-600'}`}>
+                    {MEAL_LABELS[e.meal]}
+                  </span>
+                  <span className="flex-1 text-sm text-gray-700">
+                    {e.time && <span className="text-xs text-gray-400 mr-1">{e.time}</span>}
+                    {e.foodName}（{e.grams}g）
+                  </span>
+                  <span className="text-sm font-semibold">{e.calories}kcal</span>
+                  <button
+                    onClick={() => saveFoodToHistory({
+                      id: e.id,
+                      foodName: e.foodName,
+                      grams: e.grams,
+                      per100g: {
+                        calories: e.grams > 0 ? Math.round(e.calories / e.grams * 100) : 0,
+                        protein: e.grams > 0 ? Math.round(e.protein / e.grams * 100 * 10) / 10 : 0,
+                        fat: e.grams > 0 ? Math.round(e.fat / e.grams * 100 * 10) / 10 : 0,
+                        carbs: e.grams > 0 ? Math.round(e.carbs / e.grams * 100 * 10) / 10 : 0,
+                      },
+                      isFavorite: true,
+                      lastUsed: e.date,
+                      useCount: 1,
+                    })}
+                    className="text-lg leading-none hover:scale-110 transition-transform"
+                    title="お気に入り登録"
+                  >
+                    {isFav ? '★' : '☆'}
+                  </button>
+                  <button onClick={() => removeFood(e.id)} className="text-gray-300 hover:text-red-400 transition">✕</button>
+                </div>
+              );
+            })}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between text-sm">
             <span className="text-gray-400">合計</span>
