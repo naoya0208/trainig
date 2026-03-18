@@ -6,6 +6,7 @@ import { supabase } from './supabase';
 export interface FoodEntry {
   id: string;
   date: string;
+  time?: string; // HH:MM形式
   meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   foodName: string;
   grams: number;

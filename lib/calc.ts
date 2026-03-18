@@ -109,6 +109,28 @@ export function getBMIStatus(bmi: number): { label: string; color: string } {
   return { label: '肥満', color: 'text-red-500' };
 }
 
+export interface NutritionTargets {
+  protein: number;  // g
+  fat: number;      // g
+  carbs: number;    // g
+  fiber: number;    // g（食物繊維）
+}
+
+/** 1日の栄養素目標量を計算 */
+export function calcNutritionTargets(p: Profile): NutritionTargets {
+  const { targetCalories } = calcTargetCalories(p);
+  // タンパク質: 体重 × 1.6g（運動習慣あり）〜 体重 × 1.2g（低活動）
+  const proteinMultiplier = p.activityLevel >= 1.55 ? 1.6 : 1.2;
+  const protein = Math.round(p.weight * proteinMultiplier);
+  // 脂質: 総カロリーの25%
+  const fat = Math.round((targetCalories * 0.25) / 9);
+  // 炭水化物: 残りカロリーから計算
+  const carbs = Math.round((targetCalories - protein * 4 - fat * 9) / 4);
+  // 食物繊維: 20〜25g/日
+  const fiber = 22;
+  return { protein, fat, carbs, fiber };
+}
+
 /** 標準体重・適正体重の目安を返す */
 export function calcIdealWeight(height: number): {
   standard: number;  // 身長²×22（標準体重）

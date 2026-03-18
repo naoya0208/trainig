@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
-import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits } from '@/lib/calc';
+import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets } from '@/lib/calc';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -10,6 +10,8 @@ export default function Home() {
   const { profile, foodEntries, workoutSessions, hydrate } = useStore();
   const [advice, setAdvice] = useState<{ status: string; message: string; tips: string[] } | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
+  const [nutritionAdvice, setNutritionAdvice] = useState<{ deficiencies: any[]; timing: any[]; overall: string } | null>(null);
+  const [loadingNutrition, setLoadingNutrition] = useState(false);
 
   useEffect(() => { hydrate(); }, []);
 
@@ -35,6 +37,7 @@ export default function Home() {
   const bmiStatus = getBMIStatus(bmi);
   const appleWatchActive = profile.appleWatchCalories && profile.appleWatchCalories > 0;
   const limits = calcCalorieLimits(profile);
+  const nutritionTargets = calcNutritionTargets(profile);
 
   const todayFood = foodEntries.filter(e => e.date === TODAY);
   const todayWork = workoutSessions.filter(s => s.date === TODAY);
@@ -48,6 +51,25 @@ export default function Home() {
   const protein = todayFood.reduce((s, e) => s + e.protein, 0);
   const fat = todayFood.reduce((s, e) => s + e.fat, 0);
   const carbs = todayFood.reduce((s, e) => s + e.carbs, 0);
+
+  async function getNutritionAdvice() {
+    setLoadingNutrition(true);
+    try {
+      const currentTime = new Date().toTimeString().slice(0, 5);
+      const res = await fetch('/api/gemini/nutrition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile: { ...profile, targetCalories },
+          targets: nutritionTargets,
+          consumed: { calories: consumed, protein, fat, carbs },
+          todayEntries: todayFood,
+          currentTime,
+        }),
+      });
+      setNutritionAdvice(await res.json());
+    } finally { setLoadingNutrition(false); }
+  }
 
   async function getAIAdvice() {
     setLoadingAdvice(true);
@@ -176,22 +198,82 @@ export default function Home() {
         </div>
       )}
 
-      {/* PFC */}
+      {/* PFC + 栄養分析 */}
       <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
-        <p className="text-sm font-semibold text-gray-500 mb-3">PFCバランス</p>
-        <div className="space-y-2">
-          {[
-            { label: 'P タンパク質', val: protein, dot: 'bg-blue-500' },
-            { label: 'F 脂質', val: fat, dot: 'bg-yellow-500' },
-            { label: 'C 炭水化物', val: carbs, dot: 'bg-green-500' },
-          ].map(item => (
-            <div key={item.label} className="flex items-center gap-3">
-              <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
-              <span className="text-sm text-gray-600 flex-1">{item.label}</span>
-              <span className="text-sm font-semibold">{item.val.toFixed(1)}g</span>
-            </div>
-          ))}
+        <div className="flex justify-between items-center mb-3">
+          <p className="text-sm font-semibold text-gray-500">栄養バランス</p>
+          <button onClick={getNutritionAdvice} disabled={loadingNutrition}
+            className="bg-gradient-to-r from-green-500 to-blue-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50">
+            {loadingNutrition ? '⏳' : '🔍 AI栄養分析'}
+          </button>
         </div>
+        <div className="space-y-3">
+          {[
+            { label: 'P タンパク質', val: protein, target: nutritionTargets.protein, dot: 'bg-blue-500', bar: 'bg-blue-400' },
+            { label: 'F 脂質', val: fat, target: nutritionTargets.fat, dot: 'bg-yellow-500', bar: 'bg-yellow-400' },
+            { label: 'C 炭水化物', val: carbs, target: nutritionTargets.carbs, dot: 'bg-green-500', bar: 'bg-green-400' },
+          ].map(item => {
+            const pct = Math.min(100, Math.round((item.val / item.target) * 100));
+            const over = item.val > item.target;
+            return (
+              <div key={item.label}>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
+                  <span className="text-sm text-gray-600 flex-1">{item.label}</span>
+                  <span className={`text-sm font-semibold ${over ? 'text-orange-500' : ''}`}>{item.val.toFixed(1)}g</span>
+                  <span className="text-xs text-gray-400">/ {item.target}g</span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden ml-5">
+                  <div className={`h-full rounded-full ${over ? 'bg-orange-400' : item.bar}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* AI栄養分析結果 */}
+        {nutritionAdvice && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-xs font-bold text-green-600">🔍 AI栄養分析</p>
+              <button onClick={() => setNutritionAdvice(null)} className="text-gray-300 hover:text-gray-500">✕</button>
+            </div>
+            <p className="text-sm text-gray-700 mb-3">{nutritionAdvice.overall}</p>
+
+            {/* 不足栄養素 */}
+            {nutritionAdvice.deficiencies?.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-gray-500 mb-2">不足している栄養素</p>
+                <div className="space-y-2">
+                  {nutritionAdvice.deficiencies.map((d: any, i: number) => (
+                    <div key={i} className={`rounded-lg p-2 text-xs ${d.severity === 'high' ? 'bg-red-50' : d.severity === 'medium' ? 'bg-yellow-50' : 'bg-gray-50'}`}>
+                      <span className={`font-semibold ${d.severity === 'high' ? 'text-red-600' : d.severity === 'medium' ? 'text-yellow-600' : 'text-gray-600'}`}>
+                        {d.severity === 'high' ? '🔴' : d.severity === 'medium' ? '🟡' : '🟢'} {d.nutrient}（残り{d.remaining}）
+                      </span>
+                      <p className="text-gray-600 mt-0.5">{d.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 摂取タイミング */}
+            {nutritionAdvice.timing?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">推奨摂取タイミング</p>
+                <div className="space-y-2">
+                  {nutritionAdvice.timing.map((t: any, i: number) => (
+                    <div key={i} className="bg-blue-50 rounded-lg p-2 text-xs">
+                      <p className="font-semibold text-blue-700">{t.time} - {t.meal}</p>
+                      <p className="text-gray-700 mt-0.5">{t.suggestion}</p>
+                      <p className="text-gray-400 mt-0.5">{t.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 今日のログ */}

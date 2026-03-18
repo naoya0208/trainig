@@ -179,6 +179,7 @@ export default function FoodPage() {
   const [tab, setTab] = useState<'ai' | 'favorites' | 'history'>('ai');
   const [query, setQuery] = useState('');
   const [meal, setMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch');
+  const [eatTime, setEatTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [results, setResults] = useState<AIFood[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -208,7 +209,7 @@ export default function FoodPage() {
   function handleAddFood(food: AIFood, ingredients: Ingredient[]) {
     const totals = sumIngredients(ingredients);
     const entry: FoodEntry = {
-      id: Date.now().toString(), date: TODAY, meal,
+      id: Date.now().toString(), date: TODAY, time: eatTime, meal,
       foodName: food.name, grams: totals.grams,
       calories: totals.calories, protein: totals.protein,
       fat: totals.fat, carbs: totals.carbs,
@@ -230,7 +231,7 @@ export default function FoodPage() {
 
   function handleAddSaved(saved: SavedFood, grams: number) {
     const n = calcNutrition(saved.per100g, grams);
-    addFood({ id: Date.now().toString(), date: TODAY, meal, foodName: saved.foodName, grams, ...n });
+    addFood({ id: Date.now().toString(), date: TODAY, time: eatTime, meal, foodName: saved.foodName, grams, ...n });
     saveFoodToHistory({ ...saved, grams, lastUsed: TODAY, useCount: saved.useCount + 1 });
   }
 
@@ -242,14 +243,18 @@ export default function FoodPage() {
         <span className="text-xl font-bold">{totalCal.toLocaleString()} kcal</span>
       </div>
 
-      {/* 食事タイミング */}
-      <div className="flex gap-2 mb-4">
-        {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(m => (
-          <button key={m} onClick={() => setMeal(m)}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${meal === m ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-            {MEAL_LABELS[m]}
-          </button>
-        ))}
+      {/* 食事タイミング＋時間 */}
+      <div className="bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm flex items-center gap-3">
+        <div className="flex gap-2 flex-1">
+          {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(m => (
+            <button key={m} onClick={() => setMeal(m)}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${meal === m ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+              {MEAL_LABELS[m]}
+            </button>
+          ))}
+        </div>
+        <input type="time" value={eatTime} onChange={e => setEatTime(e.target.value)}
+          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
       </div>
 
       {/* タブ */}
@@ -321,7 +326,10 @@ export default function FoodPage() {
                   'bg-purple-100 text-purple-600'}`}>
                   {MEAL_LABELS[e.meal]}
                 </span>
-                <span className="flex-1 text-sm text-gray-700">{e.foodName}（{e.grams}g）</span>
+                <span className="flex-1 text-sm text-gray-700">
+                  {e.time && <span className="text-xs text-gray-400 mr-1">{e.time}</span>}
+                  {e.foodName}（{e.grams}g）
+                </span>
                 <span className="text-sm font-semibold">{e.calories}kcal</span>
                 <button onClick={() => removeFood(e.id)} className="text-gray-300 hover:text-red-400 transition">✕</button>
               </div>
