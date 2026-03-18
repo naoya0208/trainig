@@ -7,7 +7,7 @@ import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalor
 const TODAY = new Date().toISOString().split('T')[0];
 
 export default function Home() {
-  const { profile, foodEntries, workoutSessions, hydrate } = useStore();
+  const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate } = useStore();
   const [advice, setAdvice] = useState<{ status: string; message: string; tips: string[] } | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [nutritionAdvice, setNutritionAdvice] = useState<{ deficiencies: any[]; timing: any[]; overall: string } | null>(null);
@@ -310,12 +310,35 @@ export default function Home() {
             <Link href="/food" className="text-blue-600 text-sm font-semibold">+ 追加</Link>
           </div>
           {todayFood.length === 0 ? <p className="text-sm text-gray-300 text-center py-4">まだ記録がありません</p>
-            : todayFood.slice(-3).map(e => (
-              <div key={e.id} className="flex justify-between py-1.5 text-sm border-b border-gray-50 last:border-0">
-                <span className="text-gray-600 truncate">{e.foodName}（{e.grams}g）</span>
-                <span className="font-semibold ml-2">{e.calories}kcal</span>
-              </div>
-            ))}
+            : todayFood.slice(-3).map(e => {
+              const isFav = savedFoods.some(f => f.foodName === e.foodName && f.isFavorite);
+              return (
+                <div key={e.id} className="flex items-center justify-between py-1.5 text-sm border-b border-gray-50 last:border-0">
+                  <span className="text-gray-600 truncate flex-1">{e.foodName}（{e.grams}g）</span>
+                  <span className="font-semibold ml-2">{e.calories}kcal</span>
+                  <button
+                    onClick={() => saveFoodToHistory({
+                      id: e.id,
+                      foodName: e.foodName,
+                      grams: e.grams,
+                      per100g: {
+                        calories: e.grams > 0 ? Math.round(e.calories / e.grams * 100) : 0,
+                        protein: e.grams > 0 ? parseFloat((e.protein / e.grams * 100).toFixed(1)) : 0,
+                        fat: e.grams > 0 ? parseFloat((e.fat / e.grams * 100).toFixed(1)) : 0,
+                        carbs: e.grams > 0 ? parseFloat((e.carbs / e.grams * 100).toFixed(1)) : 0,
+                      },
+                      isFavorite: true,
+                      lastUsed: e.date,
+                      useCount: 1,
+                    })}
+                    className="ml-2 text-lg leading-none hover:scale-110 transition-transform"
+                    title="お気に入り登録"
+                  >
+                    {isFav ? '★' : '☆'}
+                  </button>
+                </div>
+              );
+            })}
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <div className="flex justify-between items-center mb-3">

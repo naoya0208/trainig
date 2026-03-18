@@ -27,9 +27,10 @@ export function calcBMR(p: Profile): number {
 }
 
 export function calcTDEE(p: Profile): number {
-  // Apple Watch実測値があれば優先
+  // Apple Watch実測値があれば優先（ただしBMRより低い場合は不完全なデータとして無視）
   if (p.appleWatchCalories && p.appleWatchCalories > 0) {
-    return p.appleWatchCalories;
+    const bmr = calcBMR(p);
+    if (p.appleWatchCalories >= bmr) return p.appleWatchCalories;
   }
   return Math.round(calcBMR(p) * p.activityLevel);
 }

@@ -115,28 +115,29 @@ export const useStore = create<Store>((set, get) => ({
     let next: SavedFood[];
     if (idx >= 0) {
       next = existing.map((f, i) => i === idx
-        ? { ...f, useCount: f.useCount + 1, lastUsed: food.lastUsed, grams: food.grams }
+        ? { ...f, useCount: f.useCount + 1, lastUsed: food.lastUsed, grams: food.grams, isFavorite: food.isFavorite ?? f.isFavorite }
         : f
       );
     } else {
       next = [...existing, food];
     }
-    set({ savedFoods: next }); save(KEYS.savedFoods, next);
+    set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
   },
 
   toggleFavorite: (id) => {
     const next = get().savedFoods.map(f => f.id === id ? { ...f, isFavorite: !f.isFavorite } : f);
-    set({ savedFoods: next }); save(KEYS.savedFoods, next);
+    set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
   },
 
   setSyncCode: (code) => { set({ syncCode: code }); save(KEYS.syncCode, code); },
 
   syncToCloud: async () => {
-    const { syncCode, profile, foodEntries, weightEntries, workoutSessions } = get();
+    const { syncCode, profile, foodEntries, weightEntries, workoutSessions, savedFoods } = get();
     if (!syncCode || !profile) return;
     await supabase.from('user_data').upsert({
       sync_code: syncCode, profile, food_entries: foodEntries,
       weight_entries: weightEntries, workout_sessions: workoutSessions,
+      saved_foods: savedFoods,
       updated_at: new Date().toISOString(),
     });
   },
@@ -148,9 +149,11 @@ export const useStore = create<Store>((set, get) => ({
     const foodEntries = data.food_entries as FoodEntry[];
     const weightEntries = data.weight_entries as WeightEntry[];
     const workoutSessions = data.workout_sessions as WorkoutSession[];
-    set({ profile, foodEntries, weightEntries, workoutSessions, syncCode: code });
+    const savedFoods = (data.saved_foods as SavedFood[]) ?? [];
+    set({ profile, foodEntries, weightEntries, workoutSessions, savedFoods, syncCode: code });
     save(KEYS.profile, profile); save(KEYS.food, foodEntries);
     save(KEYS.weight, weightEntries); save(KEYS.workout, workoutSessions);
+    save(KEYS.savedFoods, savedFoods);
     save(KEYS.syncCode, code);
     return true;
   },
