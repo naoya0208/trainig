@@ -204,38 +204,50 @@ function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
         <button onClick={() => setOpen(o => !o)} className="text-gray-400 text-xs flex-shrink-0">{open ? '▲' : '▼'}</button>
         <button onClick={() => onAdd(saved, grams)} className="bg-blue-600 text-white text-xs px-2 py-1.5 rounded-lg font-semibold flex-shrink-0">追加</button>
       </div>
-      {open && (
-        <div className="bg-gray-50 rounded-xl mx-1 mb-2 px-3 py-2 text-xs text-gray-600 space-y-1.5">
-          {saved.ingredients && saved.ingredients.length > 0 ? (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 mb-1.5">具材</p>
-              {saved.ingredients.map((ing, i) => (
-                <div key={i} className="flex justify-between">
-                  <span className="text-gray-600">{ing.name}</span>
-                  <span className="text-gray-400">{ing.grams}g / {ing.calories}kcal</span>
-                </div>
-              ))}
-              <div className="border-t border-gray-200 mt-1.5 pt-1.5">
-                <div className="grid grid-cols-3 gap-x-4 gap-y-1">
-                  <span className="text-gray-400">タンパク質</span><span className="font-semibold text-blue-600 col-span-2">{n.protein}g</span>
-                  <span className="text-gray-400">脂質</span><span className="font-semibold text-yellow-600 col-span-2">{n.fat}g</span>
-                  <span className="text-gray-400">炭水化物</span><span className="font-semibold text-green-600 col-span-2">{n.carbs}g</span>
-                  <span className="text-gray-400">100gあたり</span><span className="col-span-2">{saved.per100g.calories}kcal</span>
+      {open && (() => {
+        const micros = calcFoodMicros(saved, grams);
+        const hasMicros = MICRO_DEFS.some(d => (micros[d.key] ?? 0) > 0);
+        return (
+          <div className="bg-gray-50 rounded-xl mx-1 mb-2 px-3 py-2 text-xs text-gray-600 space-y-1.5">
+            {saved.ingredients && saved.ingredients.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">具材</p>
+                {saved.ingredients.map((ing, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span className="text-gray-600">{ing.name}</span>
+                    <span className="text-gray-400">{ing.grams}g / {ing.calories}kcal</span>
+                  </div>
+                ))}
+                <div className="border-t border-gray-200 mt-1.5 pt-1.5">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span className="font-semibold text-blue-600">P {n.protein}g</span>
+                    <span className="font-semibold text-yellow-600">F {n.fat}g</span>
+                    <span className="font-semibold text-green-600">C {n.carbs}g</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <span className="text-gray-400">タンパク質</span><span className="font-semibold text-blue-600">{n.protein}g</span>
-              <span className="text-gray-400">脂質</span><span className="font-semibold text-yellow-600">{n.fat}g</span>
-              <span className="text-gray-400">炭水化物</span><span className="font-semibold text-green-600">{n.carbs}g</span>
-              <span className="text-gray-400">100gあたり</span><span>{saved.per100g.calories}kcal</span>
-            </div>
-          )}
-          {saved.note && <p className="text-gray-400 pt-1 border-t border-gray-100">{saved.note}</p>}
-          <p className="text-gray-300">最終使用: {saved.lastUsed} / {saved.useCount}回</p>
-        </div>
-      )}
+            ) : (
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                <span className="font-semibold text-blue-600">P {n.protein}g</span>
+                <span className="font-semibold text-yellow-600">F {n.fat}g</span>
+                <span className="font-semibold text-green-600">C {n.carbs}g</span>
+              </div>
+            )}
+            {hasMicros && (
+              <div className="border-t border-gray-100 pt-1.5 flex flex-wrap gap-x-2 gap-y-1">
+                {MICRO_DEFS.map(d => {
+                  const v = micros[d.key] ?? 0;
+                  return v > 0 ? (
+                    <span key={d.key} className="text-purple-600 font-semibold">{d.label} {v}{d.unit}</span>
+                  ) : null;
+                })}
+              </div>
+            )}
+            {saved.note && <p className="text-gray-400 pt-1 border-t border-gray-100">{saved.note}</p>}
+            <p className="text-gray-300">最終使用: {saved.lastUsed} / {saved.useCount}回</p>
+          </div>
+        );
+      })()}
     </div>
   );
 }
