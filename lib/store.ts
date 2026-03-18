@@ -51,6 +51,7 @@ export interface FavoriteGroup {
   id: string;
   name: string;
   itemIds: string[]; // SavedFood.id の配列
+  itemGrams?: Record<string, number>; // アイテムごとのg上書き
 }
 
 export interface WeightEntry {

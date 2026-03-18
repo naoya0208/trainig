@@ -39,6 +39,26 @@ function calcNutrition(per100g: SavedFood['per100g'], grams: number) {
   const r = grams / 100;
   return { calories: Math.round(per100g.calories * r), protein: Math.round(per100g.protein * r * 10) / 10, fat: Math.round(per100g.fat * r * 10) / 10, carbs: Math.round(per100g.carbs * r * 10) / 10 };
 }
+function calcFoodMicros(saved: SavedFood, grams: number): MicroNutrients {
+  if (!saved.ingredients || saved.ingredients.length === 0 || saved.grams === 0) return {};
+  const totalMicros = sumIngredients(saved.ingredients as Ingredient[]).micros;
+  return scaleMicros(totalMicros, grams / saved.grams) ?? {};
+}
+function sumGroupNutrition(group: FavoriteGroup, savedFoods: SavedFood[]) {
+  const items = group.itemIds.map(id => savedFoods.find(f => f.id === id)).filter(Boolean) as SavedFood[];
+  return items.reduce((acc, f) => {
+    const g = group.itemGrams?.[f.id] ?? f.grams;
+    const n = calcNutrition(f.per100g, g);
+    const m = calcFoodMicros(f, g);
+    return {
+      calories: acc.calories + n.calories,
+      protein: Math.round((acc.protein + n.protein) * 10) / 10,
+      fat: Math.round((acc.fat + n.fat) * 10) / 10,
+      carbs: Math.round((acc.carbs + n.carbs) * 10) / 10,
+      micros: addMicros(acc.micros, m),
+    };
+  }, { calories: 0, protein: 0, fat: 0, carbs: 0, micros: {} as MicroNutrients });
+}
 
 function GramsInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [val, setVal] = useState(String(value));
@@ -283,7 +303,7 @@ export default function FoodPage() {
 
   function handleAddGroup(group: FavoriteGroup) {
     const items = group.itemIds.map(id => savedFoods.find(f => f.id === id)).filter(Boolean) as SavedFood[];
-    items.forEach(saved => handleAddSaved(saved, saved.grams));
+    items.forEach(saved => handleAddSaved(saved, group.itemGrams?.[saved.id] ?? saved.grams));
   }
 
   function handleCreateGroup() {
@@ -380,40 +400,71 @@ export default function FoodPage() {
             <div className="space-y-3 mb-3">
               {favoriteGroups.map(group => {
                 const items = group.itemIds.map(id => savedFoods.find(f => f.id === id)).filter(Boolean) as SavedFood[];
-                const totalCals = items.reduce((s, f) => s + calcNutrition(f.per100g, f.grams).calories, 0);
+                const totals = sumGroupNutrition(group, savedFoods);
+                const hasMicros = MICRO_DEFS.some(d => (totals.micros[d.key] ?? 0) > 0);
                 return (
                   <div key={group.id} className="border border-gray-100 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm font-semibold flex-1">{group.name}</span>
-                      <span className="text-xs text-gray-400">{items.length}品 / {totalCals}kcal</span>
+                      <span className="text-xs text-gray-400">{items.length}品</span>
                       <button onClick={() => handleAddGroup(group)}
                         className="bg-blue-600 text-white text-xs px-2 py-1 rounded-lg font-semibold">一括追加</button>
                       <button onClick={() => setEditingGroup(editingGroup === group.id ? null : group.id)}
-                        className="text-gray-400 text-xs px-1">編集</button>
+                        className="text-gray-400 text-xs px-1">{editingGroup === group.id ? '完了' : '編集'}</button>
                       <button onClick={() => removeFavoriteGroup(group.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
                     </div>
+                    {/* 合計PFC */}
                     {items.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {items.map(f => (
-                          <span key={f.id} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{f.foodName}</span>
-                        ))}
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 mb-2">
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                          <span className="font-bold text-gray-700">{totals.calories} kcal</span>
+                          <span className="text-blue-600 font-semibold">P {totals.protein}g</span>
+                          <span className="text-yellow-600 font-semibold">F {totals.fat}g</span>
+                          <span className="text-green-600 font-semibold">C {totals.carbs}g</span>
+                        </div>
+                        {hasMicros && (
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+                            {MICRO_DEFS.map(d => { const v = totals.micros[d.key] ?? 0; return v > 0 ? <span key={d.key} className="text-xs text-purple-500">{d.label} {v}{d.unit}</span> : null; })}
+                          </div>
+                        )}
                       </div>
                     )}
-                    {/* グループ編集：お気に入りをトグルで追加/削除 */}
-                    {editingGroup === group.id && (
-                      <div className="border-t border-gray-100 pt-2 mt-2">
-                        <p className="text-xs text-gray-400 mb-2">追加するお気に入りを選択</p>
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                          {favorites.map(f => (
-                            <button key={f.id} onClick={() => toggleGroupItem(group.id, f.id)}
-                              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition ${group.itemIds.includes(f.id) ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-600'}`}>
-                              <span>{group.itemIds.includes(f.id) ? '✓' : '○'}</span>
-                              <span className="flex-1">{f.foodName}</span>
-                              <span className="text-gray-400">{f.grams}g</span>
-                            </button>
-                          ))}
+                    {/* グループ編集：お気に入りをトグルで追加/削除＋g編集 */}
+                    {editingGroup === group.id ? (
+                      <div className="border-t border-gray-100 pt-2 mt-1">
+                        <p className="text-xs text-gray-400 mb-2">追加するお気に入りを選択・gを調整</p>
+                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                          {favorites.map(f => {
+                            const inGroup = group.itemIds.includes(f.id);
+                            const g = group.itemGrams?.[f.id] ?? f.grams;
+                            const n = calcNutrition(f.per100g, g);
+                            return (
+                              <div key={f.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition ${inGroup ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                                <button onClick={() => toggleGroupItem(group.id, f.id)} className={`flex-shrink-0 ${inGroup ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>{inGroup ? '✓' : '○'}</button>
+                                <span className={`flex-1 truncate ${inGroup ? 'text-blue-700 font-semibold' : 'text-gray-600'}`}>{f.foodName}</span>
+                                {inGroup ? (
+                                  <>
+                                    <GramsInput value={g} onChange={newG => updateFavoriteGroup(group.id, { itemGrams: { ...group.itemGrams, [f.id]: newG } })} />
+                                    <span className="text-gray-400">g</span>
+                                    <span className="text-gray-500 w-14 text-right">{n.calories}kcal</span>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-300">{f.grams}g</span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
+                    ) : (
+                      items.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {items.map(f => {
+                            const g = group.itemGrams?.[f.id] ?? f.grams;
+                            return <span key={f.id} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{f.foodName} {g}g</span>;
+                          })}
+                        </div>
+                      )
                     )}
                   </div>
                 );
