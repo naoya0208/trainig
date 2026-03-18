@@ -209,26 +209,38 @@ export default function Home() {
         </div>
         <div className="space-y-3">
           {[
-            { label: 'P タンパク質', val: protein, target: nutritionTargets.protein, dot: 'bg-blue-500', bar: 'bg-blue-400' },
-            { label: 'F 脂質', val: fat, target: nutritionTargets.fat, dot: 'bg-yellow-500', bar: 'bg-yellow-400' },
-            { label: 'C 炭水化物', val: carbs, target: nutritionTargets.carbs, dot: 'bg-green-500', bar: 'bg-green-400' },
+            { label: 'P タンパク質', val: protein, target: nutritionTargets.protein, max: nutritionTargets.proteinMax, dot: 'bg-blue-500', bar: 'bg-blue-400' },
+            { label: 'F 脂質', val: fat, target: nutritionTargets.fat, max: nutritionTargets.fatMax, dot: 'bg-yellow-500', bar: 'bg-yellow-400' },
+            { label: 'C 炭水化物', val: carbs, target: nutritionTargets.carbs, max: nutritionTargets.carbsMax, dot: 'bg-green-500', bar: 'bg-green-400' },
           ].map(item => {
-            const pct = Math.min(100, Math.round((item.val / item.target) * 100));
-            const over = item.val > item.target;
+            const overMax = item.val > item.max;
+            const overTarget = item.val > item.target;
+            const pct = Math.min(100, Math.round((item.val / item.max) * 100));
+            const targetPct = Math.min(100, Math.round((item.target / item.max) * 100));
             return (
               <div key={item.label}>
-                <div className="flex items-center gap-3 mb-1">
+                <div className="flex items-center gap-2 mb-1">
                   <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
                   <span className="text-sm text-gray-600 flex-1">{item.label}</span>
-                  <span className={`text-sm font-semibold ${over ? 'text-orange-500' : ''}`}>{item.val.toFixed(1)}g</span>
-                  <span className="text-xs text-gray-400">/ {item.target}g</span>
+                  <span className={`text-sm font-semibold ${overMax ? 'text-red-500' : overTarget ? 'text-orange-400' : ''}`}>
+                    {item.val.toFixed(1)}g
+                  </span>
+                  <span className="text-xs text-gray-400">目標{item.target}g</span>
+                  <span className="text-xs text-red-300">上限{item.max}g</span>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden ml-5">
-                  <div className={`h-full rounded-full ${over ? 'bg-orange-400' : item.bar}`} style={{ width: `${pct}%` }} />
+                {/* バー: 上限を100%として表示、目標位置にマーカー */}
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden ml-5 relative">
+                  <div className={`h-full rounded-full transition-all ${overMax ? 'bg-red-400' : overTarget ? 'bg-orange-400' : item.bar}`}
+                    style={{ width: `${pct}%` }} />
+                  {/* 目標位置マーカー */}
+                  <div className="absolute top-0 h-full w-0.5 bg-gray-400 opacity-60"
+                    style={{ left: `${targetPct}%` }} />
                 </div>
+                {overMax && <p className="text-xs text-red-500 ml-5 mt-0.5">⚠️ 上限超過</p>}
               </div>
             );
           })}
+          <p className="text-xs text-gray-300 mt-1">バーの縦線 = 推奨目標 / バー右端 = 上限</p>
         </div>
 
         {/* AI栄養分析結果 */}

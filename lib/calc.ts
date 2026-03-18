@@ -110,25 +110,31 @@ export function getBMIStatus(bmi: number): { label: string; color: string } {
 }
 
 export interface NutritionTargets {
-  protein: number;  // g
-  fat: number;      // g
-  carbs: number;    // g
-  fiber: number;    // g（食物繊維）
+  protein: number;     // g 目標
+  proteinMax: number;  // g 上限（体重×2.5g 腎臓負担上限）
+  fat: number;         // g 目標
+  fatMax: number;      // g 上限（総カロリーの35%）
+  carbs: number;       // g 目標
+  carbsMax: number;    // g 上限（総カロリーの65%）
+  fiber: number;       // g 目標
 }
 
 /** 1日の栄養素目標量を計算 */
 export function calcNutritionTargets(p: Profile): NutritionTargets {
   const { targetCalories } = calcTargetCalories(p);
-  // タンパク質: 体重 × 1.6g（運動習慣あり）〜 体重 × 1.2g（低活動）
+  // タンパク質: 体重×1.6g（運動あり）〜1.2g（低活動）/ 上限: 体重×2.5g
   const proteinMultiplier = p.activityLevel >= 1.55 ? 1.6 : 1.2;
   const protein = Math.round(p.weight * proteinMultiplier);
-  // 脂質: 総カロリーの25%
+  const proteinMax = Math.round(p.weight * 2.5);
+  // 脂質: 総カロリーの25% / 上限: 35%
   const fat = Math.round((targetCalories * 0.25) / 9);
-  // 炭水化物: 残りカロリーから計算
+  const fatMax = Math.round((targetCalories * 0.35) / 9);
+  // 炭水化物: 残りカロリーから計算 / 上限: 総カロリーの65%
   const carbs = Math.round((targetCalories - protein * 4 - fat * 9) / 4);
-  // 食物繊維: 20〜25g/日
+  const carbsMax = Math.round((targetCalories * 0.65) / 4);
+  // 食物繊維: 22g/日
   const fiber = 22;
-  return { protein, fat, carbs, fiber };
+  return { protein, proteinMax, fat, fatMax, carbs, carbsMax, fiber };
 }
 
 /** 標準体重・適正体重の目安を返す */
