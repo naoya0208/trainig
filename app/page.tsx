@@ -261,12 +261,26 @@ export default function Home() {
             {nutritionAdvice.timing?.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-gray-500 mb-2">推奨摂取タイミング</p>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {nutritionAdvice.timing.map((t: any, i: number) => (
-                    <div key={i} className="bg-blue-50 rounded-lg p-2 text-xs">
-                      <p className="font-semibold text-blue-700">{t.time} - {t.meal}</p>
-                      <p className="text-gray-700 mt-0.5">{t.suggestion}</p>
-                      <p className="text-gray-400 mt-0.5">{t.reason}</p>
+                    <div key={i} className="bg-blue-50 rounded-xl p-3 text-xs">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full">{t.time}</span>
+                        <span className="font-semibold text-blue-800">{t.meal}</span>
+                      </div>
+                      {/* 必要な栄養素 */}
+                      {t.nutrients?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {t.nutrients.map((n: any, j: number) => (
+                            <div key={j} className="bg-white rounded-lg px-2 py-1 border border-blue-200">
+                              <span className="font-bold text-blue-700">{n.name} {n.amount}</span>
+                              <p className="text-gray-400 mt-0.5">{n.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-gray-700 font-medium mb-1">▶ {t.suggestion}</p>
+                      {t.effect && <p className="text-gray-400">{t.effect}</p>}
                     </div>
                   ))}
                 </div>

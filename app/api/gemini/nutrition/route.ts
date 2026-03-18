@@ -33,7 +33,15 @@ ${todayEntries.map((e: any) => `- ${e.time || e.meal}: ${e.foodName}（${e.grams
     {"nutrient": "栄養素名", "remaining": "残り量（g）", "severity": "high/medium/low", "message": "具体的なコメント"}
   ],
   "timing": [
-    {"time": "推奨時間帯（例: 15:00〜16:00）", "meal": "食事の種類", "suggestion": "具体的な食品と量の提案", "reason": "理由"}
+    {
+      "time": "推奨時間帯（例: 15:00〜16:00）",
+      "meal": "食事の種類",
+      "nutrients": [
+        {"name": "栄養素名（例: タンパク質）", "amount": "この食事で摂るべき量（例: 20g）", "reason": "この時間に必要な理由"}
+      ],
+      "suggestion": "具体的な食品と量の提案",
+      "effect": "この食事タイミングの効果"
+    }
   ],
   "overall": "今日の食事全体への総評（1〜2文）"
 }
