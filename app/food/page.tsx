@@ -71,6 +71,22 @@ function GramsInput({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
+function NutrientInput({ label, value, unit, onChange }: { label: string; value: number; unit?: string; onChange: (v: number) => void }) {
+  const [val, setVal] = useState(String(value));
+  useEffect(() => setVal(String(value)), [value]);
+  function apply() { const n = parseFloat(val); if (!isNaN(n) && n >= 0) onChange(n); else setVal(String(value)); }
+  return (
+    <div className="flex flex-col items-center gap-0.5 min-w-0">
+      <span className="text-xs text-gray-400">{label}</span>
+      <div className="flex items-center gap-0.5">
+        <input className="w-14 text-center text-xs bg-white border border-gray-200 rounded-md py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          type="number" min={0} value={val} onChange={e => setVal(e.target.value)} onBlur={apply} onKeyDown={e => e.key === 'Enter' && apply()} />
+        {unit && <span className="text-xs text-gray-400">{unit}</span>}
+      </div>
+    </div>
+  );
+}
+
 function CountInput({ value, onChange, unit }: { value: number; onChange: (v: number) => void; unit: string }) {
   const [val, setVal] = useState(String(value));
   useEffect(() => setVal(String(value)), [value]);
@@ -93,10 +109,11 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
   isSupplement?: boolean;
 }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(food.ingredients);
-  const [baseIngredients] = useState<Ingredient[]>(food.ingredients);
+  const [baseIngredients, setBaseIngredients] = useState<Ingredient[]>(food.ingredients);
   const [counts, setCounts] = useState<number[]>(food.ingredients.map(() => 1));
   const [newIngName, setNewIngName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [expandedIng, setExpandedIng] = useState<number | null>(null);
 
   // サプリ: baseを粒数でスケール / 食品: ingredients直接
   const displayIngredients = isSupplement
@@ -112,6 +129,13 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
   }
   function updateCount(idx: number, c: number) {
     setCounts(prev => prev.map((v, i) => i === idx ? c : v));
+  }
+  function updateNutrient(idx: number, field: 'calories' | 'protein' | 'fat' | 'carbs', value: number) {
+    if (isSupplement) {
+      setBaseIngredients(prev => prev.map((ing, i) => i === idx ? { ...ing, [field]: value } : ing));
+    } else {
+      setIngredients(prev => prev.map((ing, i) => i === idx ? { ...ing, [field]: value } : ing));
+    }
   }
 
   return (
@@ -131,23 +155,38 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
           {isSupplement ? '服用量（粒数を変更できます）' : '具材（Enterまたはフォーカスを外して確定）'}
         </p>
         <div className="space-y-2">
-          {(isSupplement ? baseIngredients : ingredients).map((ing, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-sm text-gray-700 flex-1">{ing.name}</span>
-              {isSupplement ? (
-                <CountInput value={counts[i] || 1} onChange={c => updateCount(i, c)} unit={ing.servingUnit || '粒'} />
-              ) : (
-                <>
-                  <GramsInput value={ing.grams} onChange={g => updateGrams(i, g)} />
-                  <span className="text-xs text-gray-400">g</span>
-                </>
-              )}
-              <span className="text-xs text-gray-500 w-14 text-right">{displayIngredients[i]?.calories ?? 0}kcal</span>
-              {!isSupplement && (
-                <button onClick={() => setIngredients(prev => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition text-sm">✕</button>
-              )}
-            </div>
-          ))}
+          {(isSupplement ? baseIngredients : ingredients).map((ing, i) => {
+            const disp = displayIngredients[i] ?? ing;
+            const isExpanded = expandedIng === i;
+            return (
+              <div key={i}>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-700 flex-1 truncate">{ing.name}</span>
+                  {isSupplement ? (
+                    <CountInput value={counts[i] || 1} onChange={c => updateCount(i, c)} unit={ing.servingUnit || '粒'} />
+                  ) : (
+                    <>
+                      <GramsInput value={ing.grams} onChange={g => updateGrams(i, g)} />
+                      <span className="text-xs text-gray-400">g</span>
+                    </>
+                  )}
+                  <span className="text-xs text-gray-500 w-14 text-right">{disp.calories}kcal</span>
+                  <button onClick={() => setExpandedIng(isExpanded ? null : i)} className="text-gray-300 hover:text-blue-400 text-xs transition">{isExpanded ? '▲' : '▼'}</button>
+                  {!isSupplement && (
+                    <button onClick={() => setIngredients(prev => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition text-sm">✕</button>
+                  )}
+                </div>
+                {isExpanded && (
+                  <div className="mt-1.5 mb-1 ml-2 pl-2 border-l-2 border-blue-100 flex flex-wrap gap-2">
+                    <NutrientInput label="kcal" value={ing.calories} onChange={v => updateNutrient(i, 'calories', v)} />
+                    <NutrientInput label="P" unit="g" value={ing.protein} onChange={v => updateNutrient(i, 'protein', v)} />
+                    <NutrientInput label="F" unit="g" value={ing.fat} onChange={v => updateNutrient(i, 'fat', v)} />
+                    <NutrientInput label="C" unit="g" value={ing.carbs} onChange={v => updateNutrient(i, 'carbs', v)} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         {!isSupplement && (showAdd ? (
           <div className="flex gap-2 mt-2">
