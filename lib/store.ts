@@ -31,15 +31,26 @@ export interface FoodEntry {
   micros?: MicroNutrients;
 }
 
+export interface SavedIngredient {
+  name: string; grams: number; calories: number; protein: number; fat: number; carbs: number; micros?: MicroNutrients;
+}
+
 export interface SavedFood {
   id: string;
   foodName: string;
   grams: number; // デフォルトg
   per100g: { calories: number; protein: number; fat: number; carbs: number };
+  ingredients?: SavedIngredient[]; // 具材リスト
   note?: string;
   isFavorite: boolean;
   lastUsed: string;
   useCount: number;
+}
+
+export interface FavoriteGroup {
+  id: string;
+  name: string;
+  itemIds: string[]; // SavedFood.id の配列
 }
 
 export interface WeightEntry {
@@ -62,6 +73,7 @@ interface Store {
   profile: Profile | null;
   foodEntries: FoodEntry[];
   savedFoods: SavedFood[];
+  favoriteGroups: FavoriteGroup[];
   weightEntries: WeightEntry[];
   workoutSessions: WorkoutSession[];
   syncCode: string;
@@ -75,6 +87,9 @@ interface Store {
   removeWorkout: (id: string) => void;
   saveFoodToHistory: (food: SavedFood) => void;
   toggleFavorite: (id: string) => void;
+  addFavoriteGroup: (g: FavoriteGroup) => void;
+  updateFavoriteGroup: (id: string, updates: Partial<FavoriteGroup>) => void;
+  removeFavoriteGroup: (id: string) => void;
   hydrate: () => void;
   setSyncCode: (code: string) => void;
   syncToCloud: () => Promise<void>;
@@ -83,7 +98,8 @@ interface Store {
 
 const KEYS = {
   profile: 'ct_profile', food: 'ct_food', weight: 'ct_weight',
-  workout: 'ct_workout', syncCode: 'ct_sync_code', savedFoods: 'ct_saved_foods'
+  workout: 'ct_workout', syncCode: 'ct_sync_code', savedFoods: 'ct_saved_foods',
+  favoriteGroups: 'ct_fav_groups',
 };
 
 function save<T>(key: string, val: T) {
@@ -98,6 +114,7 @@ export const useStore = create<Store>((set, get) => ({
   profile: null,
   foodEntries: [],
   savedFoods: [],
+  favoriteGroups: [],
   weightEntries: [],
   workoutSessions: [],
   syncCode: '',
@@ -149,15 +166,28 @@ export const useStore = create<Store>((set, get) => ({
     set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
   },
 
+  addFavoriteGroup: (g) => {
+    const next = [...get().favoriteGroups, g];
+    set({ favoriteGroups: next }); save(KEYS.favoriteGroups, next); get().syncToCloud();
+  },
+  updateFavoriteGroup: (id, updates) => {
+    const next = get().favoriteGroups.map(g => g.id === id ? { ...g, ...updates } : g);
+    set({ favoriteGroups: next }); save(KEYS.favoriteGroups, next); get().syncToCloud();
+  },
+  removeFavoriteGroup: (id) => {
+    const next = get().favoriteGroups.filter(g => g.id !== id);
+    set({ favoriteGroups: next }); save(KEYS.favoriteGroups, next); get().syncToCloud();
+  },
+
   setSyncCode: (code) => { set({ syncCode: code }); save(KEYS.syncCode, code); },
 
   syncToCloud: async () => {
-    const { syncCode, profile, foodEntries, weightEntries, workoutSessions, savedFoods } = get();
+    const { syncCode, profile, foodEntries, weightEntries, workoutSessions, savedFoods, favoriteGroups } = get();
     if (!syncCode || !profile) return;
     await supabase.from('user_data').upsert({
       sync_code: syncCode, profile, food_entries: foodEntries,
       weight_entries: weightEntries, workout_sessions: workoutSessions,
-      saved_foods: savedFoods,
+      saved_foods: savedFoods, favorite_groups: favoriteGroups,
       updated_at: new Date().toISOString(),
     });
   },
@@ -170,10 +200,11 @@ export const useStore = create<Store>((set, get) => ({
     const weightEntries = data.weight_entries as WeightEntry[];
     const workoutSessions = data.workout_sessions as WorkoutSession[];
     const savedFoods = (data.saved_foods as SavedFood[]) ?? [];
-    set({ profile, foodEntries, weightEntries, workoutSessions, savedFoods, syncCode: code });
+    const favoriteGroups = (data.favorite_groups as FavoriteGroup[]) ?? [];
+    set({ profile, foodEntries, weightEntries, workoutSessions, savedFoods, favoriteGroups, syncCode: code });
     save(KEYS.profile, profile); save(KEYS.food, foodEntries);
     save(KEYS.weight, weightEntries); save(KEYS.workout, workoutSessions);
-    save(KEYS.savedFoods, savedFoods);
+    save(KEYS.savedFoods, savedFoods); save(KEYS.favoriteGroups, favoriteGroups);
     save(KEYS.syncCode, code);
     return true;
   },
@@ -184,6 +215,7 @@ export const useStore = create<Store>((set, get) => ({
       profile: load(KEYS.profile, null),
       foodEntries: load(KEYS.food, []),
       savedFoods: load(KEYS.savedFoods, []),
+      favoriteGroups: load(KEYS.favoriteGroups, []),
       weightEntries: load(KEYS.weight, []),
       workoutSessions: load(KEYS.workout, []),
       syncCode,

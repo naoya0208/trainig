@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useStore, FoodEntry, SavedFood, MicroNutrients } from '@/lib/store';
+import { useStore, FoodEntry, SavedFood, SavedIngredient, FavoriteGroup, MicroNutrients } from '@/lib/store';
 import { MICRO_DEFS } from '@/lib/micros';
 
-const TODAY = new Date().toISOString().split('T')[0];
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function tomorrowStr() { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; }
 
 interface Ingredient { name: string; grams: number; calories: number; protein: number; fat: number; carbs: number; micros?: MicroNutrients; }
 interface AIFood { name: string; note?: string; ingredients: Ingredient[]; }
@@ -15,18 +16,15 @@ function scaleMicros(m: MicroNutrients | undefined, r: number): MicroNutrients |
   const s = (v?: number) => v != null ? Math.round(v * r * 10) / 10 : undefined;
   return { fiber: s(m.fiber), vitaminD: s(m.vitaminD), vitaminB12: s(m.vitaminB12), vitaminC: s(m.vitaminC), iron: s(m.iron), calcium: s(m.calcium), zinc: s(m.zinc), omega3: s(m.omega3), sodium: s(m.sodium) };
 }
-
 function addMicros(a: MicroNutrients, b: MicroNutrients | undefined): MicroNutrients {
   const add = (x?: number, y?: number) => x != null || y != null ? Math.round(((x ?? 0) + (y ?? 0)) * 10) / 10 : undefined;
   return { fiber: add(a.fiber, b?.fiber), vitaminD: add(a.vitaminD, b?.vitaminD), vitaminB12: add(a.vitaminB12, b?.vitaminB12), vitaminC: add(a.vitaminC, b?.vitaminC), iron: add(a.iron, b?.iron), calcium: add(a.calcium, b?.calcium), zinc: add(a.zinc, b?.zinc), omega3: add(a.omega3, b?.omega3), sodium: add(a.sodium, b?.sodium) };
 }
-
 function scaleIngredient(ing: Ingredient, newGrams: number): Ingredient {
   if (ing.grams === 0) return { ...ing, grams: newGrams };
   const r = newGrams / ing.grams;
   return { ...ing, grams: newGrams, calories: Math.round(ing.calories * r), protein: Math.round(ing.protein * r * 10) / 10, fat: Math.round(ing.fat * r * 10) / 10, carbs: Math.round(ing.carbs * r * 10) / 10, micros: scaleMicros(ing.micros, r) };
 }
-
 function sumIngredients(ings: Ingredient[]) {
   return ings.reduce((acc, i) => ({
     calories: acc.calories + i.calories,
@@ -37,30 +35,25 @@ function sumIngredients(ings: Ingredient[]) {
     micros: addMicros(acc.micros, i.micros),
   }), { calories: 0, protein: 0, fat: 0, carbs: 0, grams: 0, micros: {} as MicroNutrients });
 }
+function calcNutrition(per100g: SavedFood['per100g'], grams: number) {
+  const r = grams / 100;
+  return { calories: Math.round(per100g.calories * r), protein: Math.round(per100g.protein * r * 10) / 10, fat: Math.round(per100g.fat * r * 10) / 10, carbs: Math.round(per100g.carbs * r * 10) / 10 };
+}
 
-// g入力：onBlurで確定、途中で空文字を許容
 function GramsInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [val, setVal] = useState(String(value));
   useEffect(() => setVal(String(value)), [value]);
-  function apply() {
-    const g = parseFloat(val);
-    if (!isNaN(g) && g > 0) onChange(g);
-    else setVal(String(value));
-  }
+  function apply() { const g = parseFloat(val); if (!isNaN(g) && g > 0) onChange(g); else setVal(String(value)); }
   return (
-    <input
-      className="w-16 text-center text-sm bg-white border border-gray-200 rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
-      type="number" value={val}
-      onChange={e => setVal(e.target.value)}
-      onBlur={apply}
-      onKeyDown={e => e.key === 'Enter' && apply()}
-    />
+    <input className="w-16 text-center text-sm bg-white border border-gray-200 rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+      type="number" value={val} onChange={e => setVal(e.target.value)} onBlur={apply} onKeyDown={e => e.key === 'Enter' && apply()} />
   );
 }
 
-function EditableFoodCard({ food, meal, onAdd }: {
+function EditableFoodCard({ food, meal, onAdd, onSaveFavorite }: {
   food: AIFood; meal: string;
   onAdd: (food: AIFood, ingredients: Ingredient[]) => void;
+  onSaveFavorite: (food: AIFood, ingredients: Ingredient[]) => void;
 }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(food.ingredients);
   const [newIngName, setNewIngName] = useState('');
@@ -83,9 +76,8 @@ function EditableFoodCard({ food, meal, onAdd }: {
           <p className="text-xs text-gray-400">{totals.grams}g</p>
         </div>
       </div>
-
       <div className="bg-gray-50 rounded-xl p-3 mb-3">
-        <p className="text-xs font-semibold text-gray-500 mb-2">具材（gを編集可・Enterまたはフォーカスを外して確定）</p>
+        <p className="text-xs font-semibold text-gray-500 mb-2">具材（Enterまたはフォーカスを外して確定）</p>
         <div className="space-y-2">
           {ingredients.map((ing, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -93,8 +85,7 @@ function EditableFoodCard({ food, meal, onAdd }: {
               <GramsInput value={ing.grams} onChange={g => updateGrams(i, g)} />
               <span className="text-xs text-gray-400">g</span>
               <span className="text-xs text-gray-500 w-14 text-right">{ing.calories}kcal</span>
-              <button onClick={() => setIngredients(prev => prev.filter((_, j) => j !== i))}
-                className="text-gray-300 hover:text-red-400 transition text-sm">✕</button>
+              <button onClick={() => setIngredients(prev => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition text-sm">✕</button>
             </div>
           ))}
         </div>
@@ -102,55 +93,34 @@ function EditableFoodCard({ food, meal, onAdd }: {
           <div className="flex gap-2 mt-2">
             <input className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
               placeholder="具材名" value={newIngName} onChange={e => setNewIngName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && newIngName.trim()) {
-                  setIngredients(prev => [...prev, { name: newIngName, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]);
-                  setNewIngName(''); setShowAdd(false);
-                }
-              }} autoFocus />
-            <button onClick={() => {
-              if (newIngName.trim()) {
-                setIngredients(prev => [...prev, { name: newIngName, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]);
-                setNewIngName(''); setShowAdd(false);
-              }
-            }} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg">追加</button>
+              onKeyDown={e => { if (e.key === 'Enter' && newIngName.trim()) { setIngredients(prev => [...prev, { name: newIngName, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]); setNewIngName(''); setShowAdd(false); } }} autoFocus />
+            <button onClick={() => { if (newIngName.trim()) { setIngredients(prev => [...prev, { name: newIngName, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]); setNewIngName(''); setShowAdd(false); } }} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg">追加</button>
             <button onClick={() => setShowAdd(false)} className="text-xs text-gray-400">✕</button>
           </div>
         ) : (
           <button onClick={() => setShowAdd(true)} className="mt-2 text-xs text-blue-600 font-semibold w-full text-center py-1">+ 具材を追加</button>
         )}
       </div>
-
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
         <span className="text-blue-600 font-semibold">P {totals.protein}g</span>
         <span className="text-yellow-600 font-semibold">F {totals.fat}g</span>
         <span className="text-green-600 font-semibold">C {totals.carbs}g</span>
-        {MICRO_DEFS.map(d => {
-          const v = totals.micros?.[d.key] ?? 0;
-          if (v <= 0) return null;
-          return <span key={d.key} className="text-purple-500 font-semibold">{d.label} {v}{d.unit}</span>;
-        })}
+        {MICRO_DEFS.map(d => { const v = totals.micros?.[d.key] ?? 0; return v > 0 ? <span key={d.key} className="text-purple-500 font-semibold">{d.label} {v}{d.unit}</span> : null; })}
       </div>
-
-      <button onClick={() => onAdd(food, ingredients)}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
-        {MEAL_LABELS[meal]}に追加
-      </button>
+      <div className="flex gap-2">
+        <button onClick={() => onSaveFavorite(food, ingredients)}
+          className="flex-1 bg-yellow-50 border border-yellow-200 text-yellow-700 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-100 transition">
+          ★ お気に入りに保存
+        </button>
+        <button onClick={() => onAdd(food, ingredients)}
+          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
+          {MEAL_LABELS[meal]}に追加
+        </button>
+      </div>
     </div>
   );
 }
 
-function calcNutrition(per100g: SavedFood['per100g'], grams: number) {
-  const r = grams / 100;
-  return {
-    calories: Math.round(per100g.calories * r),
-    protein: Math.round(per100g.protein * r * 10) / 10,
-    fat: Math.round(per100g.fat * r * 10) / 10,
-    carbs: Math.round(per100g.carbs * r * 10) / 10,
-  };
-}
-
-// コンパクトなお気に入り・履歴カード（トグルで内訳表示）
 function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
   saved: SavedFood; meal: string;
   onAdd: (s: SavedFood, g: number) => void;
@@ -162,11 +132,8 @@ function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
 
   return (
     <div className="border-b border-gray-50 last:border-0">
-      {/* メイン行 */}
       <div className="flex items-center gap-2 py-2">
-        <button onClick={() => onToggleFav(saved.id)} className="text-base flex-shrink-0">
-          {saved.isFavorite ? '★' : '☆'}
-        </button>
+        <button onClick={() => onToggleFav(saved.id)} className="text-base flex-shrink-0">{saved.isFavorite ? '★' : '☆'}</button>
         <button onClick={() => setOpen(o => !o)} className="flex-1 text-left min-w-0">
           <span className="text-sm text-gray-800 truncate block">{saved.foodName}</span>
         </button>
@@ -175,23 +142,37 @@ function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
           <span className="text-xs text-gray-400">g</span>
         </div>
         <span className="text-xs font-semibold text-gray-700 w-16 text-right flex-shrink-0">{n.calories}kcal</span>
-        <button onClick={() => setOpen(o => !o)} className="text-gray-400 text-xs flex-shrink-0">
-          {open ? '▲' : '▼'}
-        </button>
-        <button onClick={() => onAdd(saved, grams)}
-          className="bg-blue-600 text-white text-xs px-2 py-1.5 rounded-lg font-semibold flex-shrink-0">
-          追加
-        </button>
+        <button onClick={() => setOpen(o => !o)} className="text-gray-400 text-xs flex-shrink-0">{open ? '▲' : '▼'}</button>
+        <button onClick={() => onAdd(saved, grams)} className="bg-blue-600 text-white text-xs px-2 py-1.5 rounded-lg font-semibold flex-shrink-0">追加</button>
       </div>
-      {/* 内訳トグル */}
       {open && (
-        <div className="bg-gray-50 rounded-xl mx-1 mb-2 px-3 py-2 text-xs text-gray-600 space-y-1">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <span className="text-gray-400">タンパク質</span><span className="font-semibold text-blue-600">{n.protein}g</span>
-            <span className="text-gray-400">脂質</span><span className="font-semibold text-yellow-600">{n.fat}g</span>
-            <span className="text-gray-400">炭水化物</span><span className="font-semibold text-green-600">{n.carbs}g</span>
-            <span className="text-gray-400">100gあたり</span><span>{saved.per100g.calories}kcal</span>
-          </div>
+        <div className="bg-gray-50 rounded-xl mx-1 mb-2 px-3 py-2 text-xs text-gray-600 space-y-1.5">
+          {saved.ingredients && saved.ingredients.length > 0 ? (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">具材</p>
+              {saved.ingredients.map((ing, i) => (
+                <div key={i} className="flex justify-between">
+                  <span className="text-gray-600">{ing.name}</span>
+                  <span className="text-gray-400">{ing.grams}g / {ing.calories}kcal</span>
+                </div>
+              ))}
+              <div className="border-t border-gray-200 mt-1.5 pt-1.5">
+                <div className="grid grid-cols-3 gap-x-4 gap-y-1">
+                  <span className="text-gray-400">タンパク質</span><span className="font-semibold text-blue-600 col-span-2">{n.protein}g</span>
+                  <span className="text-gray-400">脂質</span><span className="font-semibold text-yellow-600 col-span-2">{n.fat}g</span>
+                  <span className="text-gray-400">炭水化物</span><span className="font-semibold text-green-600 col-span-2">{n.carbs}g</span>
+                  <span className="text-gray-400">100gあたり</span><span className="col-span-2">{saved.per100g.calories}kcal</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <span className="text-gray-400">タンパク質</span><span className="font-semibold text-blue-600">{n.protein}g</span>
+              <span className="text-gray-400">脂質</span><span className="font-semibold text-yellow-600">{n.fat}g</span>
+              <span className="text-gray-400">炭水化物</span><span className="font-semibold text-green-600">{n.carbs}g</span>
+              <span className="text-gray-400">100gあたり</span><span>{saved.per100g.calories}kcal</span>
+            </div>
+          )}
           {saved.note && <p className="text-gray-400 pt-1 border-t border-gray-100">{saved.note}</p>}
           <p className="text-gray-300">最終使用: {saved.lastUsed} / {saved.useCount}回</p>
         </div>
@@ -200,37 +181,20 @@ function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
   );
 }
 
-// 今日の記録：常にg入力欄を表示
 function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
-  entry: FoodEntry;
-  onRemove: (id: string) => void;
+  entry: FoodEntry; onRemove: (id: string) => void;
   onUpdate: (id: string, updates: Partial<FoodEntry>) => void;
-  isFav: boolean;
-  onFav: () => void;
+  isFav: boolean; onFav: () => void;
 }) {
   function handleGramsChange(g: number) {
     if (g === entry.grams) return;
     const r = g / entry.grams;
-    onUpdate(entry.id, {
-      grams: g,
-      calories: Math.round(entry.calories * r),
-      protein: Math.round(entry.protein * r * 10) / 10,
-      fat: Math.round(entry.fat * r * 10) / 10,
-      carbs: Math.round(entry.carbs * r * 10) / 10,
-      fiber: entry.fiber != null ? Math.round(entry.fiber * r * 10) / 10 : undefined,
-    });
+    onUpdate(entry.id, { grams: g, calories: Math.round(entry.calories * r), protein: Math.round(entry.protein * r * 10) / 10, fat: Math.round(entry.fat * r * 10) / 10, carbs: Math.round(entry.carbs * r * 10) / 10, micros: entry.micros ? scaleMicros(entry.micros, r) : undefined });
   }
-
   return (
     <div className="py-2 border-b border-gray-50 last:border-0">
       <div className="flex items-center gap-2">
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-          entry.meal === 'breakfast' ? 'bg-orange-100 text-orange-600' :
-          entry.meal === 'lunch' ? 'bg-green-100 text-green-600' :
-          entry.meal === 'dinner' ? 'bg-blue-100 text-blue-600' :
-          'bg-purple-100 text-purple-600'}`}>
-          {MEAL_LABELS[entry.meal]}
-        </span>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${entry.meal === 'breakfast' ? 'bg-orange-100 text-orange-600' : entry.meal === 'lunch' ? 'bg-green-100 text-green-600' : entry.meal === 'dinner' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>{MEAL_LABELS[entry.meal]}</span>
         <span className="flex-1 text-sm text-gray-700 truncate">
           {entry.time && <span className="text-xs text-gray-400 mr-1">{entry.time}</span>}
           {entry.foodName}
@@ -244,58 +208,43 @@ function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
         <button onClick={() => onRemove(entry.id)} className="text-gray-300 hover:text-red-400 flex-shrink-0">✕</button>
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400 mt-0.5 ml-2 pl-14">
-        <span>P {entry.protein}g</span>
-        <span>F {entry.fat}g</span>
-        <span>C {entry.carbs}g</span>
-        {MICRO_DEFS.map(d => {
-          const v = entry.micros?.[d.key] ?? (d.key === 'fiber' ? entry.fiber : undefined) ?? 0;
-          if (v <= 0) return null;
-          return <span key={d.key} className="text-purple-400">{d.label} {v}{d.unit}</span>;
-        })}
+        <span>P {entry.protein}g</span><span>F {entry.fat}g</span><span>C {entry.carbs}g</span>
+        {MICRO_DEFS.map(d => { const v = entry.micros?.[d.key] ?? (d.key === 'fiber' ? entry.fiber : undefined) ?? 0; return v > 0 ? <span key={d.key} className="text-purple-400">{d.label} {v}{d.unit}</span> : null; })}
       </div>
     </div>
   );
 }
 
 export default function FoodPage() {
-  const { foodEntries, savedFoods, addFood, removeFood, updateFood, saveFoodToHistory, toggleFavorite, hydrate } = useStore();
+  const { foodEntries, savedFoods, favoriteGroups, addFood, removeFood, updateFood, saveFoodToHistory, toggleFavorite, addFavoriteGroup, updateFavoriteGroup, removeFavoriteGroup, hydrate } = useStore();
   const [tab, setTab] = useState<'ai' | 'favorites' | 'history'>('ai');
   const [query, setQuery] = useState('');
   const [meal, setMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch');
   const [eatTime, setEatTime] = useState(() => new Date().toTimeString().slice(0, 5));
+  const [eatDate, setEatDate] = useState(() => todayStr());
   const [results, setResults] = useState<AIFood[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // グループ管理
+  const [newGroupName, setNewGroupName] = useState('');
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
 
   useEffect(() => { hydrate(); }, []);
 
-  const todayEntries = foodEntries.filter(e => e.date === TODAY);
+  const todayEntries = foodEntries.filter(e => e.date === eatDate);
   const totalCal = todayEntries.reduce((s, e) => s + e.calories, 0);
   const totalProtein = todayEntries.reduce((s, e) => s + e.protein, 0);
-  const totalFiber = todayEntries.reduce((s, e) => s + (e.fiber ?? 0), 0);
   const favorites = savedFoods.filter(f => f.isFavorite);
   const history = [...savedFoods].sort((a, b) => b.lastUsed.localeCompare(a.lastUsed));
 
-  // タンパク質補給タイミング（次の食事タイミングの目安）
-  const now = new Date();
-  const hour = now.getHours();
-  const nextProteinTiming = (() => {
-    if (hour < 10) return { time: '朝食', suggestion: '朝食でタンパク質を摂りましょう' };
-    if (hour < 13) return { time: '昼食', suggestion: '昼食でタンパク質を摂りましょう' };
-    if (hour < 16) return { time: '間食（14〜16時）', suggestion: 'プロテインや乳製品で補給を' };
-    if (hour < 19) return { time: '夕食', suggestion: '夕食でタンパク質を摂りましょう' };
-    if (hour < 22) return { time: '夕食後間食', suggestion: 'カゼインプロテインや乳製品を' };
-    return null;
-  })();
+  const now = new Date(); const hour = now.getHours();
+  const nextProteinTiming = hour < 10 ? { time: '朝食', suggestion: '朝食でタンパク質を摂りましょう' } : hour < 13 ? { time: '昼食', suggestion: '昼食でタンパク質を摂りましょう' } : hour < 16 ? { time: '間食（14〜16時）', suggestion: 'プロテインや乳製品で補給を' } : hour < 19 ? { time: '夕食', suggestion: '夕食でタンパク質を摂りましょう' } : hour < 22 ? { time: '夕食後間食', suggestion: 'カゼインプロテインや乳製品を' } : null;
 
   async function handleSearch() {
     if (!query.trim()) return;
     setLoading(true); setError(''); setResults([]);
     try {
-      const res = await fetch('/api/gemini/food', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
+      const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
       const data = await res.json();
       if (data.foods) setResults(data.foods);
       else setError('取得に失敗しました');
@@ -303,56 +252,85 @@ export default function FoodPage() {
     finally { setLoading(false); }
   }
 
+  function buildEntry(name: string, totals: ReturnType<typeof sumIngredients>, note?: string): FoodEntry {
+    return { id: Date.now().toString(), date: eatDate, time: eatTime, meal, foodName: name, grams: totals.grams, calories: totals.calories, protein: totals.protein, fat: totals.fat, carbs: totals.carbs, micros: totals.micros };
+  }
+
+  function buildSavedFood(food: AIFood, ingredients: Ingredient[]): SavedFood {
+    const totals = sumIngredients(ingredients);
+    const per100g = totals.grams > 0 ? { calories: Math.round(totals.calories / totals.grams * 100), protein: Math.round(totals.protein / totals.grams * 100 * 10) / 10, fat: Math.round(totals.fat / totals.grams * 100 * 10) / 10, carbs: Math.round(totals.carbs / totals.grams * 100 * 10) / 10 } : { calories: 0, protein: 0, fat: 0, carbs: 0 };
+    return { id: food.name, foodName: food.name, grams: totals.grams, per100g, ingredients: ingredients as SavedIngredient[], note: food.note, isFavorite: true, lastUsed: eatDate, useCount: 1 };
+  }
+
   function handleAddFood(food: AIFood, ingredients: Ingredient[]) {
     const totals = sumIngredients(ingredients);
-    const entry: FoodEntry = {
-      id: Date.now().toString(), date: TODAY, time: eatTime, meal,
-      foodName: food.name, grams: totals.grams,
-      calories: totals.calories, protein: totals.protein,
-      fat: totals.fat, carbs: totals.carbs,
-      micros: totals.micros,
-    };
-    addFood(entry);
-    const per100g = totals.grams > 0 ? {
-      calories: Math.round(totals.calories / totals.grams * 100),
-      protein: Math.round(totals.protein / totals.grams * 100 * 10) / 10,
-      fat: Math.round(totals.fat / totals.grams * 100 * 10) / 10,
-      carbs: Math.round(totals.carbs / totals.grams * 100 * 10) / 10,
-    } : { calories: 0, protein: 0, fat: 0, carbs: 0 };
-    saveFoodToHistory({
-      id: food.name, foodName: food.name, grams: totals.grams,
-      per100g, note: food.note, isFavorite: false,
-      lastUsed: TODAY, useCount: 1,
-    });
+    addFood(buildEntry(food.name, totals, food.note));
+    saveFoodToHistory(buildSavedFood(food, ingredients));
     setResults([]); setQuery('');
+  }
+
+  function handleSaveFavorite(food: AIFood, ingredients: Ingredient[]) {
+    saveFoodToHistory(buildSavedFood(food, ingredients));
+    setResults([]); setQuery('');
+    setTab('favorites');
   }
 
   function handleAddSaved(saved: SavedFood, grams: number) {
     const n = calcNutrition(saved.per100g, grams);
-    addFood({ id: Date.now().toString(), date: TODAY, time: eatTime, meal, foodName: saved.foodName, grams, ...n });
-    saveFoodToHistory({ ...saved, grams, lastUsed: TODAY, useCount: saved.useCount + 1 });
+    addFood({ id: Date.now().toString(), date: eatDate, time: eatTime, meal, foodName: saved.foodName, grams, ...n });
+    saveFoodToHistory({ ...saved, grams, lastUsed: eatDate, useCount: saved.useCount + 1 });
+  }
+
+  function handleAddGroup(group: FavoriteGroup) {
+    const items = group.itemIds.map(id => savedFoods.find(f => f.id === id)).filter(Boolean) as SavedFood[];
+    items.forEach(saved => handleAddSaved(saved, saved.grams));
+  }
+
+  function handleCreateGroup() {
+    if (!newGroupName.trim()) return;
+    addFavoriteGroup({ id: Date.now().toString(), name: newGroupName.trim(), itemIds: [] });
+    setNewGroupName('');
+  }
+
+  function toggleGroupItem(groupId: string, itemId: string) {
+    const group = favoriteGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const itemIds = group.itemIds.includes(itemId) ? group.itemIds.filter(i => i !== itemId) : [...group.itemIds, itemId];
+    updateFavoriteGroup(groupId, { itemIds });
   }
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-2">食事記録</h1>
-      <div className="bg-white rounded-2xl px-5 py-3 mb-5 shadow-sm flex justify-between items-center">
-        <span className="text-sm text-gray-400">今日の合計</span>
+      <div className="bg-white rounded-2xl px-5 py-3 mb-4 shadow-sm flex justify-between items-center">
+        <span className="text-sm text-gray-400">合計</span>
         <span className="text-xl font-bold">{totalCal.toLocaleString()} kcal</span>
       </div>
 
-      {/* 食事タイミング＋時間 */}
-      <div className="bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm flex items-center gap-3">
-        <div className="flex gap-2 flex-1">
+      {/* 食事タイミング・時間・日付 */}
+      <div className="bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm space-y-2">
+        <div className="flex gap-2 items-center">
           {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map(m => (
             <button key={m} onClick={() => setMeal(m)}
               className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${meal === m ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
               {MEAL_LABELS[m]}
             </button>
           ))}
+          <input type="time" value={eatTime} onChange={e => setEatTime(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex-shrink-0" />
         </div>
-        <input type="time" value={eatTime} onChange={e => setEatTime(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        {/* 日付選択 */}
+        <div className="flex gap-2 items-center">
+          <span className="text-xs text-gray-400 flex-shrink-0">日付:</span>
+          {[{ label: '今日', val: todayStr() }, { label: '明日', val: tomorrowStr() }].map(({ label, val }) => (
+            <button key={val} onClick={() => setEatDate(val)}
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${eatDate === val ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+              {label}
+            </button>
+          ))}
+          <input type="date" value={eatDate} onChange={e => setEatDate(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        </div>
       </div>
 
       {/* タブ */}
@@ -370,11 +348,9 @@ export default function FoodPage() {
         <div className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
           <p className="text-xs text-gray-400 mb-3">例:「ラーメン大盛り」「サラダチキン1個」「トースト2枚と目玉焼き」</p>
           <div className="flex gap-2">
-            <input
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            <input className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="食品名・料理名・自然文で入力..."
-              value={query} onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()} />
+              value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} />
             <button onClick={handleSearch} disabled={loading}
               className="bg-blue-600 text-white px-5 py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
               {loading ? '...' : '検索'}
@@ -383,9 +359,9 @@ export default function FoodPage() {
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {results.length > 0 && (
             <div className="mt-4 space-y-4">
-              <p className="text-sm font-semibold text-gray-500">検索結果（具材のg・追加・削除が可能）</p>
+              <p className="text-sm font-semibold text-gray-500">検索結果</p>
               {results.map((food, i) => (
-                <EditableFoodCard key={i} food={food} meal={meal} onAdd={handleAddFood} />
+                <EditableFoodCard key={i} food={food} meal={meal} onAdd={handleAddFood} onSaveFavorite={handleSaveFavorite} />
               ))}
             </div>
           )}
@@ -394,10 +370,71 @@ export default function FoodPage() {
 
       {/* お気に入り */}
       {tab === 'favorites' && (
-        <div className="bg-white rounded-2xl p-4 mb-5 shadow-sm">
-          {favorites.length === 0
-            ? <p className="text-center text-gray-300 py-12">お気に入りがありません<br/><span className="text-sm">履歴の☆をタップで追加</span></p>
-            : favorites.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+        <div className="space-y-4 mb-5">
+          {/* グループセクション */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-gray-600">グループ</p>
+            </div>
+            {favoriteGroups.length === 0 && <p className="text-xs text-gray-300 mb-3">グループを作成すると複数のメニューをまとめて追加できます</p>}
+            <div className="space-y-3 mb-3">
+              {favoriteGroups.map(group => {
+                const items = group.itemIds.map(id => savedFoods.find(f => f.id === id)).filter(Boolean) as SavedFood[];
+                const totalCals = items.reduce((s, f) => s + calcNutrition(f.per100g, f.grams).calories, 0);
+                return (
+                  <div key={group.id} className="border border-gray-100 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-semibold flex-1">{group.name}</span>
+                      <span className="text-xs text-gray-400">{items.length}品 / {totalCals}kcal</span>
+                      <button onClick={() => handleAddGroup(group)}
+                        className="bg-blue-600 text-white text-xs px-2 py-1 rounded-lg font-semibold">一括追加</button>
+                      <button onClick={() => setEditingGroup(editingGroup === group.id ? null : group.id)}
+                        className="text-gray-400 text-xs px-1">編集</button>
+                      <button onClick={() => removeFavoriteGroup(group.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                    </div>
+                    {items.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {items.map(f => (
+                          <span key={f.id} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{f.foodName}</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* グループ編集：お気に入りをトグルで追加/削除 */}
+                    {editingGroup === group.id && (
+                      <div className="border-t border-gray-100 pt-2 mt-2">
+                        <p className="text-xs text-gray-400 mb-2">追加するお気に入りを選択</p>
+                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                          {favorites.map(f => (
+                            <button key={f.id} onClick={() => toggleGroupItem(group.id, f.id)}
+                              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition ${group.itemIds.includes(f.id) ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-600'}`}>
+                              <span>{group.itemIds.includes(f.id) ? '✓' : '○'}</span>
+                              <span className="flex-1">{f.foodName}</span>
+                              <span className="text-gray-400">{f.grams}g</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* グループ作成 */}
+            <div className="flex gap-2">
+              <input className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                placeholder="新しいグループ名" value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateGroup()} />
+              <button onClick={handleCreateGroup} className="bg-gray-800 text-white px-3 py-2 rounded-xl text-sm font-semibold">作成</button>
+            </div>
+          </div>
+
+          {/* お気に入りリスト */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <p className="text-sm font-semibold text-gray-600 mb-2">お気に入り</p>
+            {favorites.length === 0
+              ? <p className="text-center text-gray-300 py-8">お気に入りがありません<br/><span className="text-sm">履歴の☆またはAI検索の「★お気に入りに保存」で追加</span></p>
+              : favorites.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+          </div>
         </div>
       )}
 
@@ -414,15 +451,14 @@ export default function FoodPage() {
       {todayEntries.length > 0 && (
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-gray-500">今日の記録</p>
+            <p className="text-sm font-semibold text-gray-500">
+              {eatDate === todayStr() ? '今日' : eatDate === tomorrowStr() ? '明日' : eatDate}の記録
+            </p>
             <div className="flex gap-3 text-xs text-gray-400">
               <span>P <strong className="text-gray-600">{totalProtein.toFixed(1)}g</strong></span>
-              {totalFiber > 0 && <span>食物繊維 <strong className="text-gray-600">{totalFiber.toFixed(1)}g</strong></span>}
             </div>
           </div>
-
-          {/* タンパク質補給タイミング */}
-          {nextProteinTiming && (
+          {nextProteinTiming && eatDate === todayStr() && (
             <div className="bg-blue-50 rounded-xl px-3 py-2 mb-3 flex items-center gap-2">
               <span className="text-blue-500 text-sm">💪</span>
               <div>
@@ -431,36 +467,16 @@ export default function FoodPage() {
               </div>
             </div>
           )}
-
           <div className="space-y-0">
             {todayEntries.map(e => {
               const isFav = savedFoods.some(f => f.foodName === e.foodName && f.isFavorite);
               return (
-                <TodayEntryRow
-                  key={e.id}
-                  entry={e}
-                  onRemove={removeFood}
-                  onUpdate={updateFood}
-                  isFav={isFav}
-                  onFav={() => saveFoodToHistory({
-                    id: e.id,
-                    foodName: e.foodName,
-                    grams: e.grams,
-                    per100g: {
-                      calories: e.grams > 0 ? Math.round(e.calories / e.grams * 100) : 0,
-                      protein: e.grams > 0 ? Math.round(e.protein / e.grams * 100 * 10) / 10 : 0,
-                      fat: e.grams > 0 ? Math.round(e.fat / e.grams * 100 * 10) / 10 : 0,
-                      carbs: e.grams > 0 ? Math.round(e.carbs / e.grams * 100 * 10) / 10 : 0,
-                    },
-                    isFavorite: true,
-                    lastUsed: e.date,
-                    useCount: 1,
-                  })}
+                <TodayEntryRow key={e.id} entry={e} onRemove={removeFood} onUpdate={updateFood} isFav={isFav}
+                  onFav={() => saveFoodToHistory({ id: e.id, foodName: e.foodName, grams: e.grams, per100g: { calories: e.grams > 0 ? Math.round(e.calories / e.grams * 100) : 0, protein: e.grams > 0 ? Math.round(e.protein / e.grams * 100 * 10) / 10 : 0, fat: e.grams > 0 ? Math.round(e.fat / e.grams * 100 * 10) / 10 : 0, carbs: e.grams > 0 ? Math.round(e.carbs / e.grams * 100 * 10) / 10 : 0 }, isFavorite: true, lastUsed: e.date, useCount: 1 })}
                 />
               );
             })}
           </div>
-
           <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between text-sm">
             <span className="text-gray-400">合計</span>
             <span className="font-bold">{totalCal.toLocaleString()} kcal</span>
