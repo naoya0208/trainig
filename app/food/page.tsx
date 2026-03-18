@@ -176,7 +176,7 @@ function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
   );
 }
 
-// 今日の記録：インライン編集行
+// 今日の記録：常にg入力欄を表示
 function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
   entry: FoodEntry;
   onRemove: (id: string) => void;
@@ -184,25 +184,17 @@ function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
   isFav: boolean;
   onFav: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [gVal, setGVal] = useState(String(entry.grams));
-
-  function applyEdit() {
-    const g = parseFloat(gVal);
-    if (!isNaN(g) && g > 0 && g !== entry.grams) {
-      const r = g / entry.grams;
-      onUpdate(entry.id, {
-        grams: g,
-        calories: Math.round(entry.calories * r),
-        protein: Math.round(entry.protein * r * 10) / 10,
-        fat: Math.round(entry.fat * r * 10) / 10,
-        carbs: Math.round(entry.carbs * r * 10) / 10,
-        fiber: entry.fiber != null ? Math.round(entry.fiber * r * 10) / 10 : undefined,
-      });
-    } else {
-      setGVal(String(entry.grams));
-    }
-    setEditing(false);
+  function handleGramsChange(g: number) {
+    if (g === entry.grams) return;
+    const r = g / entry.grams;
+    onUpdate(entry.id, {
+      grams: g,
+      calories: Math.round(entry.calories * r),
+      protein: Math.round(entry.protein * r * 10) / 10,
+      fat: Math.round(entry.fat * r * 10) / 10,
+      carbs: Math.round(entry.carbs * r * 10) / 10,
+      fiber: entry.fiber != null ? Math.round(entry.fiber * r * 10) / 10 : undefined,
+    });
   }
 
   return (
@@ -219,37 +211,20 @@ function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
           {entry.time && <span className="text-xs text-gray-400 mr-1">{entry.time}</span>}
           {entry.foodName}
         </span>
-        {editing ? (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <input
-              className="w-16 text-center text-sm bg-white border border-blue-300 rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              type="number" value={gVal}
-              onChange={e => setGVal(e.target.value)}
-              onBlur={applyEdit}
-              onKeyDown={e => e.key === 'Enter' && applyEdit()}
-              autoFocus
-            />
-            <span className="text-xs text-gray-400">g</span>
-            <button onClick={applyEdit} className="text-blue-600 text-xs font-semibold px-1">✓</button>
-          </div>
-        ) : (
-          <button onClick={() => { setGVal(String(entry.grams)); setEditing(true); }}
-            className="text-xs text-gray-400 hover:text-blue-500 flex-shrink-0">
-            {entry.grams}g
-          </button>
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <GramsInput value={entry.grams} onChange={handleGramsChange} />
+          <span className="text-xs text-gray-400">g</span>
+        </div>
         <span className="text-sm font-semibold flex-shrink-0">{entry.calories}kcal</span>
         <button onClick={onFav} className="text-base leading-none flex-shrink-0">{isFav ? '★' : '☆'}</button>
         <button onClick={() => onRemove(entry.id)} className="text-gray-300 hover:text-red-400 flex-shrink-0">✕</button>
       </div>
-      {!editing && (
-        <div className="flex gap-3 text-xs text-gray-400 mt-0.5 ml-2 pl-14">
-          <span>P {entry.protein}g</span>
-          <span>F {entry.fat}g</span>
-          <span>C {entry.carbs}g</span>
-          {entry.fiber != null && <span>食物繊維 {entry.fiber}g</span>}
-        </div>
-      )}
+      <div className="flex gap-3 text-xs text-gray-400 mt-0.5 ml-2 pl-14">
+        <span>P {entry.protein}g</span>
+        <span>F {entry.fat}g</span>
+        <span>C {entry.carbs}g</span>
+        {entry.fiber != null && <span>食物繊維 {entry.fiber}g</span>}
+      </div>
     </div>
   );
 }
