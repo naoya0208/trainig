@@ -8,7 +8,7 @@ const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼�
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 function tomorrowStr() { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; }
 
-interface Ingredient { name: string; grams: number; calories: number; protein: number; fat: number; carbs: number; micros?: MicroNutrients; }
+interface Ingredient { name: string; grams: number; calories: number; protein: number; fat: number; carbs: number; micros?: MicroNutrients; servingUnit?: string; }
 interface AIFood { name: string; note?: string; ingredients: Ingredient[]; }
 
 function scaleMicros(m: MicroNutrients | undefined, r: number): MicroNutrients | undefined {
@@ -70,46 +70,83 @@ function GramsInput({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
-function EditableFoodCard({ food, meal, onAdd, onSaveFavorite }: {
+function CountInput({ value, onChange, unit }: { value: number; onChange: (v: number) => void; unit: string }) {
+  const [val, setVal] = useState(String(value));
+  useEffect(() => setVal(String(value)), [value]);
+  function apply() { const n = parseFloat(val); if (!isNaN(n) && n > 0) onChange(n); else setVal(String(value)); }
+  return (
+    <div className="flex items-center gap-1">
+      <input className="w-14 text-center text-sm bg-white border border-purple-200 rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-purple-400"
+        type="number" min={1} step={1} value={val} onChange={e => setVal(e.target.value)} onBlur={apply} onKeyDown={e => e.key === 'Enter' && apply()} />
+      <span className="text-xs text-gray-500">{unit}</span>
+    </div>
+  );
+}
+
+function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
   food: AIFood; meal: string;
   onAdd: (food: AIFood, ingredients: Ingredient[]) => void;
   onSaveFavorite: (food: AIFood, ingredients: Ingredient[]) => void;
+  isSupplement?: boolean;
 }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(food.ingredients);
+  const [baseIngredients] = useState<Ingredient[]>(food.ingredients);
+  const [counts, setCounts] = useState<number[]>(food.ingredients.map(() => 1));
   const [newIngName, setNewIngName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const totals = sumIngredients(ingredients);
+
+  // サプリ: baseを粒数でスケール / 食品: ingredients直接
+  const displayIngredients = isSupplement
+    ? baseIngredients.map((ing, i) => {
+        const c = counts[i] || 1;
+        return c === 1 ? ing : scaleIngredient(ing, c * ing.grams);
+      })
+    : ingredients;
+  const totals = sumIngredients(displayIngredients);
 
   function updateGrams(idx: number, g: number) {
     setIngredients(prev => prev.map((ing, i) => i === idx ? scaleIngredient(ing, g) : ing));
   }
+  function updateCount(idx: number, c: number) {
+    setCounts(prev => prev.map((v, i) => i === idx ? c : v));
+  }
 
   return (
-    <div className="border border-gray-100 rounded-xl p-4 hover:border-blue-200 transition">
+    <div className={`border rounded-xl p-4 transition ${isSupplement ? 'border-purple-100 hover:border-purple-300' : 'border-gray-100 hover:border-blue-200'}`}>
       <div className="flex justify-between items-start mb-3">
         <div>
           <p className="font-semibold text-gray-900">{food.name}</p>
-          {food.note && <p className="text-xs text-gray-400 mt-0.5">{food.note}</p>}
+          {food.note && <p className={`text-xs mt-0.5 ${isSupplement ? 'text-purple-400' : 'text-gray-400'}`}>{food.note}</p>}
         </div>
         <div className="text-right">
           <p className="text-lg font-bold text-gray-900">{totals.calories} kcal</p>
-          <p className="text-xs text-gray-400">{totals.grams}g</p>
+          {!isSupplement && <p className="text-xs text-gray-400">{totals.grams}g</p>}
         </div>
       </div>
       <div className="bg-gray-50 rounded-xl p-3 mb-3">
-        <p className="text-xs font-semibold text-gray-500 mb-2">具材（Enterまたはフォーカスを外して確定）</p>
+        <p className="text-xs font-semibold text-gray-500 mb-2">
+          {isSupplement ? '服用量（粒数を変更できます）' : '具材（Enterまたはフォーカスを外して確定）'}
+        </p>
         <div className="space-y-2">
-          {ingredients.map((ing, i) => (
+          {(isSupplement ? baseIngredients : ingredients).map((ing, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="text-sm text-gray-700 flex-1">{ing.name}</span>
-              <GramsInput value={ing.grams} onChange={g => updateGrams(i, g)} />
-              <span className="text-xs text-gray-400">g</span>
-              <span className="text-xs text-gray-500 w-14 text-right">{ing.calories}kcal</span>
-              <button onClick={() => setIngredients(prev => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition text-sm">✕</button>
+              {isSupplement ? (
+                <CountInput value={counts[i] || 1} onChange={c => updateCount(i, c)} unit={ing.servingUnit || '粒'} />
+              ) : (
+                <>
+                  <GramsInput value={ing.grams} onChange={g => updateGrams(i, g)} />
+                  <span className="text-xs text-gray-400">g</span>
+                </>
+              )}
+              <span className="text-xs text-gray-500 w-14 text-right">{displayIngredients[i]?.calories ?? 0}kcal</span>
+              {!isSupplement && (
+                <button onClick={() => setIngredients(prev => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition text-sm">✕</button>
+              )}
             </div>
           ))}
         </div>
-        {showAdd ? (
+        {!isSupplement && (showAdd ? (
           <div className="flex gap-2 mt-2">
             <input className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
               placeholder="具材名" value={newIngName} onChange={e => setNewIngName(e.target.value)}
@@ -119,21 +156,23 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite }: {
           </div>
         ) : (
           <button onClick={() => setShowAdd(true)} className="mt-2 text-xs text-blue-600 font-semibold w-full text-center py-1">+ 具材を追加</button>
-        )}
+        ))}
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
-        <span className="text-blue-600 font-semibold">P {totals.protein}g</span>
-        <span className="text-yellow-600 font-semibold">F {totals.fat}g</span>
-        <span className="text-green-600 font-semibold">C {totals.carbs}g</span>
-        {MICRO_DEFS.map(d => { const v = totals.micros?.[d.key] ?? 0; return v > 0 ? <span key={d.key} className="text-purple-500 font-semibold">{d.label} {v}{d.unit}</span> : null; })}
+        {!isSupplement && <>
+          <span className="text-blue-600 font-semibold">P {totals.protein}g</span>
+          <span className="text-yellow-600 font-semibold">F {totals.fat}g</span>
+          <span className="text-green-600 font-semibold">C {totals.carbs}g</span>
+        </>}
+        {MICRO_DEFS.map(d => { const v = totals.micros?.[d.key] ?? 0; return v > 0 ? <span key={d.key} className={`font-semibold ${isSupplement ? 'text-purple-600' : 'text-purple-500'}`}>{d.label} {v}{d.unit}</span> : null; })}
       </div>
       <div className="flex gap-2">
-        <button onClick={() => onSaveFavorite(food, ingredients)}
+        <button onClick={() => onSaveFavorite(food, displayIngredients)}
           className="flex-1 bg-yellow-50 border border-yellow-200 text-yellow-700 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-100 transition">
           ★ お気に入りに保存
         </button>
-        <button onClick={() => onAdd(food, ingredients)}
-          className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
+        <button onClick={() => onAdd(food, displayIngredients)}
+          className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold transition ${isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
           {MEAL_LABELS[meal]}に追加
         </button>
       </div>
@@ -397,7 +436,7 @@ export default function FoodPage() {
             <div className="mt-4 space-y-4">
               <p className="text-sm font-semibold text-gray-500">検索結果</p>
               {results.map((food, i) => (
-                <EditableFoodCard key={i} food={food} meal={meal} onAdd={handleAddFood} onSaveFavorite={handleSaveFavorite} />
+                <EditableFoodCard key={i} food={food} meal={meal} onAdd={handleAddFood} onSaveFavorite={handleSaveFavorite} isSupplement={searchMode === 'supplement'} />
               ))}
             </div>
           )}
