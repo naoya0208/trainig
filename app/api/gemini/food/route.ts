@@ -4,12 +4,12 @@ import { NextRequest, NextResponse } from 'next/server';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: NextRequest) {
-  const { query } = await req.json();
+  const { query, mode } = await req.json();
   if (!query) return NextResponse.json({ error: 'query required' }, { status: 400 });
 
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const prompt = `
+  const isSupplement = mode === 'supplement';
+
+  const foodPrompt = `
 あなたは栄養士AIです。以下の食品・料理について、具材ごとの栄養情報をJSON形式で返してください。
 
 ユーザー入力: "${query}"
@@ -51,6 +51,53 @@ export async function POST(req: NextRequest) {
 - 数値は整数または小数点1桁
 - microsの各値は推定値でよい。含まれない場合は0
 `;
+
+  const supplementPrompt = `
+あなたはサプリメント専門の栄養士AIです。以下のサプリメントについて、1回摂取分の栄養情報をJSON形式で返してください。
+
+ユーザー入力: "${query}"
+
+回答はJSON配列のみ（説明文不要）:
+[
+  {
+    "name": "サプリメント名",
+    "note": "摂取タイミングや特記事項（例: 食後推奨、脂溶性なので食事と一緒に）",
+    "ingredients": [
+      {
+        "name": "1回摂取分（粒数・容量を明記、例: 2粒/5g）",
+        "grams": 1回分の重量（g, 数値）,
+        "calories": カロリー（kcal, 数値、多くは0〜5程度）,
+        "protein": タンパク質（g, 数値）,
+        "fat": 脂質（g, 数値）,
+        "carbs": 炭水化物（g, 数値）,
+        "micros": {
+          "fiber": 食物繊維（g）,
+          "vitaminD": ビタミンD（μg）,
+          "vitaminB12": ビタミンB12（μg）,
+          "vitaminC": ビタミンC（mg）,
+          "iron": 鉄分（mg）,
+          "calcium": カルシウム（mg）,
+          "zinc": 亜鉛（mg）,
+          "omega3": EPA+DHA（g）,
+          "sodium": ナトリウム（mg）
+        }
+      }
+    ]
+  }
+]
+
+ルール:
+- 1回摂取分（一般的な推奨量）を基準に記載
+- 成分が複数ある複合サプリは ingredients を複数要素に分けてもよい
+- 数値は整数または小数点1桁
+- そのサプリが含む成分のみmicrosに値を入れ、含まない場合は0
+- ブランド名が不明な場合は一般的な市販品の平均値を推定
+- 複数の商品バリエーションが考えられる場合は配列に複数追加
+`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const prompt = isSupplement ? supplementPrompt : foodPrompt;
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     const jsonMatch = text.match(/\[[\s\S]*\]/);

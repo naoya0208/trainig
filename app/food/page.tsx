@@ -245,6 +245,7 @@ export default function FoodPage() {
   const [results, setResults] = useState<AIFood[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [searchMode, setSearchMode] = useState<'food' | 'supplement'>('food');
   // グループ管理
   const [newGroupName, setNewGroupName] = useState('');
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
@@ -264,7 +265,7 @@ export default function FoodPage() {
     if (!query.trim()) return;
     setLoading(true); setError(''); setResults([]);
     try {
-      const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
+      const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, mode: searchMode }) });
       const data = await res.json();
       if (data.foods) setResults(data.foods);
       else setError('取得に失敗しました');
@@ -366,13 +367,28 @@ export default function FoodPage() {
       {/* AI検索 */}
       {tab === 'ai' && (
         <div className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
-          <p className="text-xs text-gray-400 mb-3">例:「ラーメン大盛り」「サラダチキン1個」「トースト2枚と目玉焼き」</p>
+          {/* 食品/サプリ切り替え */}
+          <div className="flex gap-1 mb-3 bg-gray-100 p-1 rounded-xl">
+            <button onClick={() => { setSearchMode('food'); setResults([]); }}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${searchMode === 'food' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>
+              🍚 食品・料理
+            </button>
+            <button onClick={() => { setSearchMode('supplement'); setResults([]); }}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${searchMode === 'supplement' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500'}`}>
+              💊 サプリ
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mb-3">
+            {searchMode === 'food'
+              ? '例:「ラーメン大盛り」「サラダチキン1個」「トースト2枚と目玉焼き」'
+              : '例:「ビタミンD」「魚油 EPA DHA」「マルチビタミン」「亜鉛サプリ」'}
+          </p>
           <div className="flex gap-2">
             <input className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="食品名・料理名・自然文で入力..."
+              placeholder={searchMode === 'food' ? '食品名・料理名・自然文で入力...' : 'サプリメント名で入力...'}
               value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} />
             <button onClick={handleSearch} disabled={loading}
-              className="bg-blue-600 text-white px-5 py-3 rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
+              className={`text-white px-5 py-3 rounded-xl text-sm font-semibold disabled:opacity-50 transition ${searchMode === 'supplement' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
               {loading ? '...' : '検索'}
             </button>
           </div>
