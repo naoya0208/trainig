@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   if (!query) return NextResponse.json({ error: 'query required' }, { status: 400 });
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const prompt = `
 あなたは栄養士AIです。以下の食品・料理について栄養情報をJSON形式で返してください。
 
@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
     if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
     const foods = JSON.parse(jsonMatch[0]);
     return NextResponse.json({ foods });
-  } catch (e) {
+  } catch (e: any) {
     console.error(e);
-    return NextResponse.json({ error: 'Gemini API error' }, { status: 500 });
+    return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
   }
 }
