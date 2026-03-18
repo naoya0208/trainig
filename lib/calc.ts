@@ -64,33 +64,37 @@ export interface CalorieLimits {
 
 export function calcCalorieLimits(p: Profile): CalorieLimits {
   const tdee = calcTDEE(p);
-  const safeMin = p.gender === 'female' ? 1200 : 1500;
+  const bmr = calcBMR(p);
 
   if (p.goalType === 'lose') {
+    // 最低限度 = BMR（臓器維持に必要な最低カロリー）
+    // 上限 = TDEE（これ以上食べると減量しない）
     return {
-      min: safeMin,
-      max: tdee - 200,
+      min: bmr,
+      max: tdee,
       target: calcTargetCalories(p).targetCalories,
-      minLabel: `安全下限 ${safeMin}kcal`,
-      maxLabel: `減量限界 ${tdee - 200}kcal`,
+      minLabel: `基礎代謝 ${bmr.toLocaleString()}kcal`,
+      maxLabel: `TDEE ${tdee.toLocaleString()}kcal`,
     };
   }
   if (p.goalType === 'gain') {
+    // 最低限度 = TDEE + 100（余剰がないと筋肉が増えない）
+    // 上限 = TDEE + 500（それ以上は脂肪になりやすい）
     return {
       min: tdee + 100,
       max: tdee + 500,
       target: calcTargetCalories(p).targetCalories,
-      minLabel: `増量下限 ${tdee + 100}kcal`,
-      maxLabel: `増量上限 ${tdee + 500}kcal`,
+      minLabel: `TDEE+100 ${(tdee + 100).toLocaleString()}kcal`,
+      maxLabel: `TDEE+500 ${(tdee + 500).toLocaleString()}kcal`,
     };
   }
-  // maintain
+  // maintain: TDEE ± 200kcal
   return {
     min: tdee - 200,
     max: tdee + 200,
     target: tdee,
-    minLabel: `維持下限 ${tdee - 200}kcal`,
-    maxLabel: `維持上限 ${tdee + 200}kcal`,
+    minLabel: `TDEE-200 ${(tdee - 200).toLocaleString()}kcal`,
+    maxLabel: `TDEE+200 ${(tdee + 200).toLocaleString()}kcal`,
   };
 }
 
