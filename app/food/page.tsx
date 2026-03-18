@@ -114,6 +114,30 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
   const [newIngName, setNewIngName] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [expandedIng, setExpandedIng] = useState<number | null>(null);
+  const [loadingIng, setLoadingIng] = useState(false);
+
+  async function addIngredientWithAI() {
+    const name = newIngName.trim();
+    if (!name) return;
+    setLoadingIng(true);
+    try {
+      const res = await fetch('/api/gemini/food', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: `${name} 100g` }),
+      });
+      const data = await res.json();
+      if (data.foods?.[0]) {
+        const totals = sumIngredients(data.foods[0].ingredients as Ingredient[]);
+        setIngredients(prev => [...prev, { name, grams: totals.grams || 100, calories: totals.calories, protein: totals.protein, fat: totals.fat, carbs: totals.carbs, micros: totals.micros }]);
+      } else {
+        setIngredients(prev => [...prev, { name, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]);
+      }
+    } catch {
+      setIngredients(prev => [...prev, { name, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]);
+    } finally {
+      setLoadingIng(false); setNewIngName(''); setShowAdd(false);
+    }
+  }
 
   // サプリ: baseを粒数でスケール / 食品: ingredients直接
   const displayIngredients = isSupplement
@@ -191,10 +215,13 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
         {!isSupplement && (showAdd ? (
           <div className="flex gap-2 mt-2">
             <input className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              placeholder="具材名" value={newIngName} onChange={e => setNewIngName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && newIngName.trim()) { setIngredients(prev => [...prev, { name: newIngName, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]); setNewIngName(''); setShowAdd(false); } }} autoFocus />
-            <button onClick={() => { if (newIngName.trim()) { setIngredients(prev => [...prev, { name: newIngName, grams: 100, calories: 0, protein: 0, fat: 0, carbs: 0 }]); setNewIngName(''); setShowAdd(false); } }} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg">追加</button>
-            <button onClick={() => setShowAdd(false)} className="text-xs text-gray-400">✕</button>
+              placeholder="具材名を入力してAIが栄養素を取得" value={newIngName} onChange={e => setNewIngName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addIngredientWithAI()} autoFocus disabled={loadingIng} />
+            <button onClick={addIngredientWithAI} disabled={loadingIng || !newIngName.trim()}
+              className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg disabled:opacity-50 min-w-[3rem] text-center">
+              {loadingIng ? '…' : '追加'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setNewIngName(''); }} className="text-xs text-gray-400">✕</button>
           </div>
         ) : (
           <button onClick={() => setShowAdd(true)} className="mt-2 text-xs text-blue-600 font-semibold w-full text-center py-1">+ 具材を追加</button>
