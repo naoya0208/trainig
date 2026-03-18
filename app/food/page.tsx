@@ -393,16 +393,21 @@ export default function FoodPage() {
             className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex-shrink-0" />
         </div>
         {/* 日付選択 */}
-        <div className="flex gap-2 items-center">
-          <span className="text-xs text-gray-400 flex-shrink-0">日付:</span>
-          {[{ label: '今日', val: todayStr() }, { label: '明日', val: tomorrowStr() }].map(({ label, val }) => (
-            <button key={val} onClick={() => setEatDate(val)}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${eatDate === val ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-              {label}
-            </button>
-          ))}
-          <input type="date" value={eatDate} onChange={e => setEatDate(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        <div className="space-y-1.5">
+          <div className="flex gap-1.5">
+            {[{ label: '今日', val: todayStr() }, { label: '明日', val: tomorrowStr() }].map(({ label, val }) => (
+              <button key={val} onClick={() => setEatDate(val)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${eatDate === val ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                {label}
+              </button>
+            ))}
+            <input type="date" value={eatDate} onChange={e => setEatDate(e.target.value)}
+              className={`flex-1 border rounded-lg px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400 transition
+                ${eatDate !== todayStr() && eatDate !== tomorrowStr() ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`} />
+          </div>
+          {eatDate !== todayStr() && (
+            <p className="text-xs text-blue-500 font-semibold pl-1">📅 {eatDate} に記録します</p>
+          )}
         </div>
       </div>
 
