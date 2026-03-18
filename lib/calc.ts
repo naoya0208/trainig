@@ -54,6 +54,46 @@ export function calcTargetCalories(p: Profile): {
   return { targetCalories, weeklyChange: safe, daysLeft, isUnsafe };
 }
 
+export interface CalorieLimits {
+  min: number;     // 最低限度（これ未満は危険）
+  max: number;     // 上限（これを超えると目標に逆行）
+  target: number;  // 推奨摂取量
+  minLabel: string;
+  maxLabel: string;
+}
+
+export function calcCalorieLimits(p: Profile): CalorieLimits {
+  const tdee = calcTDEE(p);
+  const safeMin = p.gender === 'female' ? 1200 : 1500;
+
+  if (p.goalType === 'lose') {
+    return {
+      min: safeMin,
+      max: tdee - 200,
+      target: calcTargetCalories(p).targetCalories,
+      minLabel: `安全下限 ${safeMin}kcal`,
+      maxLabel: `減量限界 ${tdee - 200}kcal`,
+    };
+  }
+  if (p.goalType === 'gain') {
+    return {
+      min: tdee + 100,
+      max: tdee + 500,
+      target: calcTargetCalories(p).targetCalories,
+      minLabel: `増量下限 ${tdee + 100}kcal`,
+      maxLabel: `増量上限 ${tdee + 500}kcal`,
+    };
+  }
+  // maintain
+  return {
+    min: tdee - 200,
+    max: tdee + 200,
+    target: tdee,
+    minLabel: `維持下限 ${tdee - 200}kcal`,
+    maxLabel: `維持上限 ${tdee + 200}kcal`,
+  };
+}
+
 export function calcBMI(weight: number, height: number): number {
   return parseFloat((weight / Math.pow(height / 100, 2)).toFixed(1));
 }

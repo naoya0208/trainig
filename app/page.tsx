@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
-import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus } from '@/lib/calc';
+import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits } from '@/lib/calc';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -34,6 +34,7 @@ export default function Home() {
   const bmi = calcBMI(profile.weight, profile.height);
   const bmiStatus = getBMIStatus(bmi);
   const appleWatchActive = profile.appleWatchCalories && profile.appleWatchCalories > 0;
+  const limits = calcCalorieLimits(profile);
 
   const todayFood = foodEntries.filter(e => e.date === TODAY);
   const todayWork = workoutSessions.filter(s => s.date === TODAY);
@@ -125,6 +126,29 @@ export default function Home() {
           <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
         </div>
         <p className="text-center text-sm text-gray-400">残り <strong className="text-gray-800">{remaining.toLocaleString()} kcal</strong></p>
+
+        {/* カロリー限度 */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 mb-2">
+            {profile.goalType === 'lose' ? '減量' : profile.goalType === 'gain' ? '増量' : '維持'}のカロリー範囲
+          </p>
+          <div className="flex items-center gap-2">
+            <div className={`flex-1 text-center rounded-xl py-2 px-2 ${consumed < limits.min ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
+              <p className={`text-sm font-bold ${consumed < limits.min ? 'text-red-500' : 'text-gray-500'}`}>{limits.min.toLocaleString()}</p>
+              <p className="text-xs text-gray-400">最低限度</p>
+              {consumed < limits.min && <p className="text-xs text-red-400">⚠️ 不足</p>}
+            </div>
+            <div className="flex-1 text-center bg-blue-50 rounded-xl py-2 px-2 border border-blue-200">
+              <p className="text-sm font-bold text-blue-600">{limits.target.toLocaleString()}</p>
+              <p className="text-xs text-gray-400">推奨摂取</p>
+            </div>
+            <div className={`flex-1 text-center rounded-xl py-2 px-2 ${consumed > limits.max ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
+              <p className={`text-sm font-bold ${consumed > limits.max ? 'text-red-500' : 'text-gray-500'}`}>{limits.max.toLocaleString()}</p>
+              <p className="text-xs text-gray-400">上限</p>
+              {consumed > limits.max && <p className="text-xs text-red-400">⚠️ 超過</p>}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* BMR・TDEE・BMI */}
