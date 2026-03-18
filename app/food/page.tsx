@@ -140,38 +140,52 @@ function calcNutrition(per100g: SavedFood['per100g'], grams: number) {
   };
 }
 
-// コンパクトなお気に入り・履歴カード
+// コンパクトなお気に入り・履歴カード（トグルで内訳表示）
 function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
   saved: SavedFood; meal: string;
   onAdd: (s: SavedFood, g: number) => void;
   onToggleFav: (id: string) => void;
 }) {
-  const [g, setG] = useState(String(saved.grams));
-  const n = calcNutrition(saved.per100g, parseFloat(g) || saved.grams);
-
-  function applyG() {
-    const v = parseFloat(g);
-    if (isNaN(v) || v <= 0) setG(String(saved.grams));
-  }
+  const [grams, setGrams] = useState(saved.grams);
+  const [open, setOpen] = useState(false);
+  const n = calcNutrition(saved.per100g, grams);
 
   return (
-    <div className="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0">
-      <button onClick={() => onToggleFav(saved.id)} className="text-base flex-shrink-0">
-        {saved.isFavorite ? '★' : '☆'}
-      </button>
-      <span className="text-sm text-gray-800 flex-1 truncate">{saved.foodName}</span>
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <GramsInput value={parseFloat(g) || saved.grams} onChange={v => setG(String(v))} />
-        <span className="text-xs text-gray-400">g</span>
+    <div className="border-b border-gray-50 last:border-0">
+      {/* メイン行 */}
+      <div className="flex items-center gap-2 py-2">
+        <button onClick={() => onToggleFav(saved.id)} className="text-base flex-shrink-0">
+          {saved.isFavorite ? '★' : '☆'}
+        </button>
+        <button onClick={() => setOpen(o => !o)} className="flex-1 text-left min-w-0">
+          <span className="text-sm text-gray-800 truncate block">{saved.foodName}</span>
+        </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <GramsInput value={grams} onChange={setGrams} />
+          <span className="text-xs text-gray-400">g</span>
+        </div>
+        <span className="text-xs font-semibold text-gray-700 w-16 text-right flex-shrink-0">{n.calories}kcal</span>
+        <button onClick={() => setOpen(o => !o)} className="text-gray-400 text-xs flex-shrink-0">
+          {open ? '▲' : '▼'}
+        </button>
+        <button onClick={() => onAdd(saved, grams)}
+          className="bg-blue-600 text-white text-xs px-2 py-1.5 rounded-lg font-semibold flex-shrink-0">
+          追加
+        </button>
       </div>
-      <span className="text-xs font-semibold text-gray-700 w-16 text-right flex-shrink-0">{n.calories}kcal</span>
-      <div className="text-xs text-gray-400 hidden sm:flex gap-1 flex-shrink-0">
-        <span>P{n.protein}</span><span>F{n.fat}</span><span>C{n.carbs}</span>
-      </div>
-      <button onClick={() => onAdd(saved, parseFloat(g) || saved.grams)}
-        className="bg-blue-600 text-white text-xs px-2 py-1.5 rounded-lg font-semibold flex-shrink-0">
-        追加
-      </button>
+      {/* 内訳トグル */}
+      {open && (
+        <div className="bg-gray-50 rounded-xl mx-1 mb-2 px-3 py-2 text-xs text-gray-600 space-y-1">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <span className="text-gray-400">タンパク質</span><span className="font-semibold text-blue-600">{n.protein}g</span>
+            <span className="text-gray-400">脂質</span><span className="font-semibold text-yellow-600">{n.fat}g</span>
+            <span className="text-gray-400">炭水化物</span><span className="font-semibold text-green-600">{n.carbs}g</span>
+            <span className="text-gray-400">100gあたり</span><span>{saved.per100g.calories}kcal</span>
+          </div>
+          {saved.note && <p className="text-gray-400 pt-1 border-t border-gray-100">{saved.note}</p>}
+          <p className="text-gray-300">最終使用: {saved.lastUsed} / {saved.useCount}回</p>
+        </div>
+      )}
     </div>
   );
 }
