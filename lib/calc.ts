@@ -122,8 +122,9 @@ export interface NutritionTargets {
 /** 1日の栄養素目標量を計算 */
 export function calcNutritionTargets(p: Profile): NutritionTargets {
   const { targetCalories } = calcTargetCalories(p);
-  // タンパク質: 体重×1.6g（運動あり）〜1.2g（低活動）/ 上限: 体重×2.5g
-  const proteinMultiplier = p.activityLevel >= 1.55 ? 1.6 : 1.2;
+  // タンパク質: 目標別に設定 / 上限: 体重×2.5g
+  // 増量: 筋合成最大化 × 2.0g / 減量: 筋肉維持しながら脂肪減 × 1.6g / 維持: × 1.4g
+  const proteinMultiplier = p.goalType === 'gain' ? 2.0 : p.goalType === 'lose' ? 1.6 : 1.4;
   const protein = Math.round(p.weight * proteinMultiplier);
   const proteinMax = Math.round(p.weight * 2.5);
   // 脂質: 総カロリーの25% / 上限: 35%
