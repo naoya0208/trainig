@@ -38,13 +38,15 @@ export interface SavedIngredient {
 export interface SavedFood {
   id: string;
   foodName: string;
-  grams: number; // デフォルトg
+  grams: number; // デフォルトg（サプリの場合は gramsPerUnit × defaultCount）
   per100g: { calories: number; protein: number; fat: number; carbs: number };
   ingredients?: SavedIngredient[]; // 具材リスト
   note?: string;
   isFavorite: boolean;
   lastUsed: string;
   useCount: number;
+  servingUnit?: string;   // "粒"/"錠"/"包" など（あればサプリとして粒数UIを表示）
+  gramsPerUnit?: number;  // 1粒あたりのg
 }
 
 export interface FavoriteGroup {

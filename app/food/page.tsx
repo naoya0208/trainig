@@ -84,10 +84,12 @@ function CountInput({ value, onChange, unit }: { value: number; onChange: (v: nu
   );
 }
 
+interface SupplementInfo { servingUnit: string; gramsPerUnit: number; }
+
 function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
   food: AIFood; meal: string;
-  onAdd: (food: AIFood, ingredients: Ingredient[]) => void;
-  onSaveFavorite: (food: AIFood, ingredients: Ingredient[]) => void;
+  onAdd: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) => void;
+  onSaveFavorite: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) => void;
   isSupplement?: boolean;
 }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(food.ingredients);
@@ -167,16 +169,23 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
         </>}
         {MICRO_DEFS.map(d => { const v = totals.micros?.[d.key] ?? 0; return v > 0 ? <span key={d.key} className={`font-semibold ${isSupplement ? 'text-purple-600' : 'text-purple-500'}`}>{d.label} {v}{d.unit}</span> : null; })}
       </div>
-      <div className="flex gap-2">
-        <button onClick={() => onSaveFavorite(food, displayIngredients)}
-          className="flex-1 bg-yellow-50 border border-yellow-200 text-yellow-700 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-100 transition">
-          ★ お気に入りに保存
-        </button>
-        <button onClick={() => onAdd(food, displayIngredients)}
-          className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold transition ${isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-          {MEAL_LABELS[meal]}に追加
-        </button>
-      </div>
+      {(() => {
+        const suppInfo: SupplementInfo | undefined = isSupplement && baseIngredients[0]
+          ? { servingUnit: baseIngredients[0].servingUnit || '粒', gramsPerUnit: baseIngredients[0].grams || 1 }
+          : undefined;
+        return (
+          <div className="flex gap-2">
+            <button onClick={() => onSaveFavorite(food, displayIngredients, suppInfo)}
+              className="flex-1 bg-yellow-50 border border-yellow-200 text-yellow-700 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-100 transition">
+              ★ お気に入りに保存
+            </button>
+            <button onClick={() => onAdd(food, displayIngredients, suppInfo)}
+              className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold transition ${isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+              {MEAL_LABELS[meal]}に追加
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -186,8 +195,17 @@ function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
   onAdd: (s: SavedFood, g: number) => void;
   onToggleFav: (id: string) => void;
 }) {
+  const isSupp = !!saved.servingUnit && !!saved.gramsPerUnit;
+  const defaultCount = isSupp && saved.gramsPerUnit ? Math.max(1, Math.round(saved.grams / saved.gramsPerUnit)) : 1;
   const [grams, setGrams] = useState(saved.grams);
+  const [count, setCount] = useState(defaultCount);
   const [open, setOpen] = useState(false);
+
+  function handleCountChange(c: number) {
+    setCount(c);
+    if (saved.gramsPerUnit) setGrams(Math.round(c * saved.gramsPerUnit * 10) / 10);
+  }
+
   const n = calcNutrition(saved.per100g, grams);
 
   return (
@@ -198,12 +216,18 @@ function SavedFoodCard({ saved, meal, onAdd, onToggleFav }: {
           <span className="text-sm text-gray-800 truncate block">{saved.foodName}</span>
         </button>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <GramsInput value={grams} onChange={setGrams} />
-          <span className="text-xs text-gray-400">g</span>
+          {isSupp ? (
+            <CountInput value={count} onChange={handleCountChange} unit={saved.servingUnit!} />
+          ) : (
+            <>
+              <GramsInput value={grams} onChange={setGrams} />
+              <span className="text-xs text-gray-400">g</span>
+            </>
+          )}
         </div>
         <span className="text-xs font-semibold text-gray-700 w-16 text-right flex-shrink-0">{n.calories}kcal</span>
         <button onClick={() => setOpen(o => !o)} className="text-gray-400 text-xs flex-shrink-0">{open ? '▲' : '▼'}</button>
-        <button onClick={() => onAdd(saved, grams)} className="bg-blue-600 text-white text-xs px-2 py-1.5 rounded-lg font-semibold flex-shrink-0">追加</button>
+        <button onClick={() => onAdd(saved, grams)} className={`text-white text-xs px-2 py-1.5 rounded-lg font-semibold flex-shrink-0 ${isSupp ? 'bg-purple-600' : 'bg-blue-600'}`}>追加</button>
       </div>
       {open && (() => {
         const micros = calcFoodMicros(saved, grams);
@@ -329,21 +353,21 @@ export default function FoodPage() {
     return { id: Date.now().toString(), date: eatDate, time: eatTime, meal, foodName: name, grams: totals.grams, calories: totals.calories, protein: totals.protein, fat: totals.fat, carbs: totals.carbs, micros: totals.micros };
   }
 
-  function buildSavedFood(food: AIFood, ingredients: Ingredient[]): SavedFood {
+  function buildSavedFood(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo): SavedFood {
     const totals = sumIngredients(ingredients);
     const per100g = totals.grams > 0 ? { calories: Math.round(totals.calories / totals.grams * 100), protein: Math.round(totals.protein / totals.grams * 100 * 10) / 10, fat: Math.round(totals.fat / totals.grams * 100 * 10) / 10, carbs: Math.round(totals.carbs / totals.grams * 100 * 10) / 10 } : { calories: 0, protein: 0, fat: 0, carbs: 0 };
-    return { id: food.name, foodName: food.name, grams: totals.grams, per100g, ingredients: ingredients as SavedIngredient[], note: food.note, isFavorite: true, lastUsed: eatDate, useCount: 1 };
+    return { id: food.name, foodName: food.name, grams: totals.grams, per100g, ingredients: ingredients as SavedIngredient[], note: food.note, isFavorite: true, lastUsed: eatDate, useCount: 1, servingUnit: suppInfo?.servingUnit, gramsPerUnit: suppInfo?.gramsPerUnit };
   }
 
-  function handleAddFood(food: AIFood, ingredients: Ingredient[]) {
+  function handleAddFood(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) {
     const totals = sumIngredients(ingredients);
     addFood(buildEntry(food.name, totals, food.note));
-    saveFoodToHistory(buildSavedFood(food, ingredients));
+    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo));
     setResults([]); setQuery('');
   }
 
-  function handleSaveFavorite(food: AIFood, ingredients: Ingredient[]) {
-    saveFoodToHistory(buildSavedFood(food, ingredients));
+  function handleSaveFavorite(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) {
+    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo));
     setResults([]); setQuery('');
     setTab('favorites');
   }
