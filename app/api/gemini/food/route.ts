@@ -27,7 +27,17 @@ export async function POST(req: NextRequest) {
         "protein": タンパク質（g, 数値）,
         "fat": 脂質（g, 数値）,
         "carbs": 炭水化物（g, 数値）,
-        "fiber": 食物繊維（g, 数値）
+        "fiber": 食物繊維（g, 数値）,
+        "extras": {
+          "ナトリウム(mg)": 数値,
+          "カルシウム(mg)": 数値,
+          "鉄分(mg)": 数値,
+          "ビタミンC(mg)": 数値,
+          "ビタミンD(μg)": 数値,
+          "ビタミンB12(μg)": 数値,
+          "EPA+DHA(g)": 数値
+          // その食品に特に含まれる栄養素のみ記載（0または微量なら省略）
+        }
       }
     ]
   }
@@ -39,6 +49,8 @@ export async function POST(req: NextRequest) {
 - グラムが明示されていない場合は一般的な1食分を推定
 - 複数の料理が含まれる場合は配列に複数追加
 - 数値は整数または小数点1桁
+- extrasはその食材に特徴的な栄養素のみ（例:魚ならEPA+DHA・ビタミンD・ビタミンB12、ほうれん草なら鉄分・カルシウム・ビタミンC）
+- 含まれない・微量の栄養素はextrasに含めない
 `;
     const result = await model.generateContent(prompt);
     const text = result.response.text();

@@ -15,6 +15,7 @@ export interface FoodEntry {
   fat: number;
   carbs: number;
   fiber?: number;
+  extras?: Record<string, number>; // ビタミン・ミネラル等（単位はGeminiが決定）
 }
 
 export interface SavedFood {
