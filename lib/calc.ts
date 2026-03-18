@@ -8,11 +8,21 @@ export interface Profile {
   height: number;
   weight: number;
   targetWeight: number;
+  targetBodyFatPercent?: number; // 目標体脂肪率（設定時はtargetWeightを上書き計算）
   bodyFatPercent?: number;
   activityLevel: ActivityLevel;
   goalType: GoalType;
   targetDate?: string;
   appleWatchCalories?: number; // Apple Watch手動入力
+}
+
+/** 目標体脂肪率が設定されている場合は除脂肪体重維持で目標体重を算出 */
+export function getEffectiveTargetWeight(p: Profile): number {
+  if (p.targetBodyFatPercent != null && p.bodyFatPercent != null) {
+    const leanMass = p.weight * (1 - p.bodyFatPercent / 100);
+    return parseFloat((leanMass / (1 - p.targetBodyFatPercent / 100)).toFixed(1));
+  }
+  return p.targetWeight;
 }
 
 export function calcBMR(p: Profile): number {
@@ -48,15 +58,16 @@ export function calcTargetCalories(p: Profile): {
   if (p.goalType === 'maintain' || !p.targetDate) {
     return { targetCalories: tdee, weeklyChange: 0, daysLeft: null, isUnsafe: false, isMinCal: false, isGoalMismatch: false };
   }
+  const effectiveTarget = getEffectiveTargetWeight(p);
   // 目標と体重の方向チェック
   const isGoalMismatch =
-    (p.goalType === 'lose' && p.targetWeight >= p.weight) ||
-    (p.goalType === 'gain' && p.targetWeight <= p.weight);
+    (p.goalType === 'lose' && effectiveTarget >= p.weight) ||
+    (p.goalType === 'gain' && effectiveTarget <= p.weight);
   if (isGoalMismatch) {
     return { targetCalories: tdee, weeklyChange: 0, daysLeft: null, isUnsafe: false, isMinCal: false, isGoalMismatch: true };
   }
   const daysLeft = Math.max(1, Math.round((new Date(p.targetDate).getTime() - Date.now()) / 86400000));
-  const weeklyChange = (p.targetWeight - p.weight) / (daysLeft / 7);
+  const weeklyChange = (effectiveTarget - p.weight) / (daysLeft / 7);
   const isUnsafe = Math.abs(weeklyChange) > 1.0;
   const safe = isUnsafe ? Math.sign(weeklyChange) * 1.0 : weeklyChange;
   let targetCalories = Math.round(tdee + (safe * 7200) / 7);

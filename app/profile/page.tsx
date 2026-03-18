@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { Profile, ActivityLevel, GoalType, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight } from '@/lib/calc';
+import { Profile, ActivityLevel, GoalType, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight } from '@/lib/calc';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
   { value: 1.2,   label: 'ほぼ非活動的', desc: 'デスクワーク・ほぼ運動なし' },
@@ -20,6 +20,8 @@ function ProfileContent() {
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [targetWeight, setTargetWeight] = useState('');
+  const [targetBodyFat, setTargetBodyFat] = useState('');
+  const [targetMode, setTargetMode] = useState<'weight' | 'bodyfat'>('weight');
   const [bodyFat, setBodyFat] = useState('');
   const [activity, setActivity] = useState<ActivityLevel>(1.55);
   const [goalType, setGoalType] = useState<GoalType>('lose');
@@ -59,6 +61,8 @@ function ProfileContent() {
       setHeight(profile.height.toString());
       setWeight(profile.weight.toString());
       setTargetWeight(profile.targetWeight.toString());
+      setTargetBodyFat(profile.targetBodyFatPercent?.toString() ?? '');
+      if (profile.targetBodyFatPercent != null) setTargetMode('bodyfat');
       setBodyFat(profile.bodyFatPercent?.toString() ?? '');
       setActivity(profile.activityLevel);
       setGoalType(profile.goalType);
@@ -68,9 +72,16 @@ function ProfileContent() {
   }, [profile]);
 
   const preview: Profile | null = (() => {
-    const a = parseInt(age), h = parseFloat(height), w = parseFloat(weight), t = parseFloat(targetWeight);
-    if (isNaN(a) || isNaN(h) || isNaN(w) || isNaN(t)) return null;
-    return { gender, age: a, height: h, weight: w, targetWeight: t,
+    const a = parseInt(age), h = parseFloat(height), w = parseFloat(weight);
+    const t = parseFloat(targetWeight);
+    const tbf = parseFloat(targetBodyFat);
+    if (isNaN(a) || isNaN(h) || isNaN(w)) return null;
+    if (targetMode === 'weight' && isNaN(t)) return null;
+    if (targetMode === 'bodyfat' && isNaN(tbf)) return null;
+    return {
+      gender, age: a, height: h, weight: w,
+      targetWeight: targetMode === 'weight' ? t : (isNaN(t) ? w : t),
+      targetBodyFatPercent: targetMode === 'bodyfat' ? tbf : undefined,
       bodyFatPercent: parseFloat(bodyFat) || undefined,
       activityLevel: activity, goalType,
       targetDate: targetDate || undefined,
@@ -128,7 +139,6 @@ function ProfileContent() {
             { label: '年齢', val: age, set: setAge, ph: '30', unit: '歳' },
             { label: '身長', val: height, set: setHeight, ph: '170', unit: 'cm' },
             { label: '現在の体重', val: weight, set: setWeight, ph: '70.0', unit: 'kg' },
-            { label: '目標体重', val: targetWeight, set: setTargetWeight, ph: '65.0', unit: 'kg' },
           ].map(f => (
             <div key={f.label}>
               <label className="text-xs font-semibold text-gray-500 block mb-1">{f.label}</label>
@@ -139,6 +149,42 @@ function ProfileContent() {
               </div>
             </div>
           ))}
+          {/* 目標：体重 or 体脂肪率 */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-xs font-semibold text-gray-500">目標</label>
+              <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
+                <button onClick={() => setTargetMode('weight')}
+                  className={`px-2 py-0.5 rounded-md font-semibold transition ${targetMode === 'weight' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
+                  体重
+                </button>
+                <button onClick={() => setTargetMode('bodyfat')}
+                  className={`px-2 py-0.5 rounded-md font-semibold transition ${targetMode === 'bodyfat' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
+                  体脂肪率
+                </button>
+              </div>
+            </div>
+            {targetMode === 'weight' ? (
+              <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
+                <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
+                  type="number" placeholder="65.0" value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
+                <span className="text-sm text-gray-400">kg</span>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
+                  <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
+                    type="number" placeholder="15.0" value={targetBodyFat} onChange={e => setTargetBodyFat(e.target.value)} />
+                  <span className="text-sm text-gray-400">%</span>
+                </div>
+                {preview?.targetBodyFatPercent != null && preview.bodyFatPercent != null && (
+                  <p className="text-xs text-blue-500 mt-1">
+                    ≈ 目標体重 {getEffectiveTargetWeight(preview)}kg
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
