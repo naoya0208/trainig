@@ -110,6 +110,18 @@ export async function POST(req: NextRequest) {
 
   const useSearch = looksLikeBrandedProduct(query);
 
+  function extractFoods(text: string): any[] | null {
+    // マークダウンコードブロックを除去
+    const cleaned = text.replace(/```(?:json|javascript)?\s*/gi, '').replace(/```/g, '');
+    const match = cleaned.match(/\[[\s\S]*\]/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const modelConfig: Parameters<typeof genAI.getGenerativeModel>[0] = {
       model: 'gemini-2.5-flash',
@@ -119,9 +131,8 @@ export async function POST(req: NextRequest) {
     const prompt = isSupplement ? supplementPrompt : foodPrompt;
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
-    const foods = JSON.parse(jsonMatch[0]);
+    const foods = extractFoods(text);
+    if (!foods) return NextResponse.json({ error: 'parse error' }, { status: 500 });
     return NextResponse.json({ foods, usedSearch: useSearch });
   } catch (e: any) {
     // 検索グラウンディング失敗時はフォールバック
@@ -131,9 +142,8 @@ export async function POST(req: NextRequest) {
         const prompt = isSupplement ? supplementPrompt : foodPrompt;
         const result = await model.generateContent(prompt);
         const text = result.response.text();
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
-        const foods = JSON.parse(jsonMatch[0]);
+        const foods = extractFoods(text);
+        if (!foods) return NextResponse.json({ error: 'parse error' }, { status: 500 });
         return NextResponse.json({ foods, usedSearch: false });
       } catch (e2: any) {
         return NextResponse.json({ error: 'Gemini API error', detail: e2?.message }, { status: 500 });
