@@ -5,6 +5,9 @@ import { MICRO_DEFS } from '@/lib/micros';
 
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
+const FOOD_CATEGORIES = ['主食', '主菜', '副菜', '乳製品', '果物', '飲み物', 'お菓子・間食', 'サプリ', 'その他'] as const;
+type FoodCategory = typeof FOOD_CATEGORIES[number];
+
 import { localDate, localDateOffset } from '@/lib/date';
 function todayStr() { return localDate(); }
 function tomorrowStr() { return localDateOffset(1); }
@@ -104,8 +107,8 @@ interface SupplementInfo { servingUnit: string; gramsPerUnit: number; }
 
 function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
   food: AIFood; meal: string;
-  onAdd: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) => void;
-  onSaveFavorite: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) => void;
+  onAdd: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
+  onSaveFavorite: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
   isSupplement?: boolean;
 }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(food.ingredients);
@@ -115,6 +118,7 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
   const [showAdd, setShowAdd] = useState(false);
   const [expandedIng, setExpandedIng] = useState<number | null>(null);
   const [loadingIng, setLoadingIng] = useState(false);
+  const [category, setCategory] = useState<FoodCategory>(isSupplement ? 'サプリ' : 'その他');
 
   async function addIngredientWithAI() {
     const name = newIngName.trim();
@@ -164,7 +168,7 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
 
   return (
     <div className={`border rounded-xl p-4 transition ${isSupplement ? 'border-purple-100 hover:border-purple-300' : 'border-gray-100 hover:border-blue-200'}`}>
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex justify-between items-start mb-2">
         <div>
           <p className="font-semibold text-gray-900">{food.name}</p>
           {food.note && <p className={`text-xs mt-0.5 ${isSupplement ? 'text-purple-400' : 'text-gray-400'}`}>{food.note}</p>}
@@ -174,6 +178,15 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
           {!isSupplement && <p className="text-xs text-gray-400">{totals.grams}g</p>}
         </div>
       </div>
+      {/* カテゴリ選択 */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs text-gray-400 flex-shrink-0">カテゴリ</span>
+        <select value={category} onChange={e => setCategory(e.target.value as FoodCategory)}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
+          {FOOD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
       <div className="bg-gray-50 rounded-xl p-3 mb-3">
         <p className="text-xs font-semibold text-gray-500 mb-2">
           {isSupplement ? '服用量（粒数を変更できます）' : '具材（Enterまたはフォーカスを外して確定）'}
@@ -241,11 +254,11 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
           : undefined;
         return (
           <div className="flex gap-2">
-            <button onClick={() => onSaveFavorite(food, displayIngredients, suppInfo)}
+            <button onClick={() => onSaveFavorite(food, displayIngredients, suppInfo, category)}
               className="flex-1 bg-yellow-50 border border-yellow-200 text-yellow-700 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-100 transition">
               ★ お気に入りに保存
             </button>
-            <button onClick={() => onAdd(food, displayIngredients, suppInfo)}
+            <button onClick={() => onAdd(food, displayIngredients, suppInfo, category)}
               className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold transition ${isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
               {MEAL_LABELS[meal]}に追加
             </button>
@@ -400,6 +413,18 @@ export default function FoodPage() {
   const favorites = savedFoods.filter(f => f.isFavorite);
   const history = [...savedFoods].sort((a, b) => b.lastUsed.localeCompare(a.lastUsed));
 
+  // カテゴリ別お気に入り（FOOD_CATEGORIESの順序で表示）
+  const favsByCategory: Record<string, SavedFood[]> = {};
+  for (const f of favorites) {
+    const cat = f.category || 'その他';
+    if (!favsByCategory[cat]) favsByCategory[cat] = [];
+    favsByCategory[cat].push(f);
+  }
+  const categoriesWithFavs = FOOD_CATEGORIES.filter(c => favsByCategory[c]?.length);
+  // FOOD_CATEGORIESに含まれないカテゴリも表示（将来の拡張に対応）
+  const otherCats = Object.keys(favsByCategory).filter(c => !(FOOD_CATEGORIES as readonly string[]).includes(c));
+  const displayCategories = [...categoriesWithFavs, ...otherCats];
+
   const now = new Date(); const hour = now.getHours();
   const nextProteinTiming = hour < 10 ? { time: '朝食', suggestion: '朝食でタンパク質を摂りましょう' } : hour < 13 ? { time: '昼食', suggestion: '昼食でタンパク質を摂りましょう' } : hour < 16 ? { time: '間食（14〜16時）', suggestion: 'プロテインや乳製品で補給を' } : hour < 19 ? { time: '夕食', suggestion: '夕食でタンパク質を摂りましょう' } : hour < 22 ? { time: '夕食後間食', suggestion: 'カゼインプロテインや乳製品を' } : null;
 
@@ -419,21 +444,21 @@ export default function FoodPage() {
     return { id: Date.now().toString(), date: eatDate, time: eatTime, meal, foodName: name, grams: totals.grams, calories: totals.calories, protein: totals.protein, fat: totals.fat, carbs: totals.carbs, micros: totals.micros };
   }
 
-  function buildSavedFood(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo): SavedFood {
+  function buildSavedFood(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string): SavedFood {
     const totals = sumIngredients(ingredients);
     const per100g = totals.grams > 0 ? { calories: Math.round(totals.calories / totals.grams * 100), protein: Math.round(totals.protein / totals.grams * 100 * 10) / 10, fat: Math.round(totals.fat / totals.grams * 100 * 10) / 10, carbs: Math.round(totals.carbs / totals.grams * 100 * 10) / 10 } : { calories: 0, protein: 0, fat: 0, carbs: 0 };
-    return { id: food.name, foodName: food.name, grams: totals.grams, per100g, ingredients: ingredients as SavedIngredient[], note: food.note, isFavorite: true, lastUsed: eatDate, useCount: 1, servingUnit: suppInfo?.servingUnit, gramsPerUnit: suppInfo?.gramsPerUnit };
+    return { id: food.name, foodName: food.name, grams: totals.grams, per100g, ingredients: ingredients as SavedIngredient[], note: food.note, isFavorite: true, lastUsed: eatDate, useCount: 1, servingUnit: suppInfo?.servingUnit, gramsPerUnit: suppInfo?.gramsPerUnit, category };
   }
 
-  function handleAddFood(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) {
+  function handleAddFood(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) {
     const totals = sumIngredients(ingredients);
     addFood(buildEntry(food.name, totals, food.note));
-    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo));
+    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo, category));
     setResults([]); setQuery('');
   }
 
-  function handleSaveFavorite(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) {
-    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo));
+  function handleSaveFavorite(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) {
+    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo, category));
     setResults([]); setQuery('');
     setTab('favorites');
   }
@@ -644,13 +669,19 @@ export default function FoodPage() {
             </div>
           </div>
 
-          {/* お気に入りリスト */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-sm font-semibold text-gray-600 mb-2">お気に入り</p>
-            {favorites.length === 0
-              ? <p className="text-center text-gray-300 py-8">お気に入りがありません<br/><span className="text-sm">履歴の☆またはAI検索の「★お気に入りに保存」で追加</span></p>
-              : favorites.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
-          </div>
+          {/* お気に入りリスト（カテゴリ別） */}
+          {favorites.length === 0 ? (
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center text-gray-300 py-8">
+              お気に入りがありません<br/><span className="text-sm">AI検索の「★お気に入りに保存」で追加</span>
+            </div>
+          ) : displayCategories.map(cat => (
+            <div key={cat} className="bg-white rounded-2xl p-4 shadow-sm">
+              <p className="text-sm font-semibold text-gray-600 mb-2">{cat}</p>
+              {(favsByCategory[cat] ?? []).map(f => (
+                <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />
+              ))}
+            </div>
+          ))}
         </div>
       )}
 

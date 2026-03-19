@@ -47,6 +47,7 @@ export interface SavedFood {
   useCount: number;
   servingUnit?: string;   // "粒"/"錠"/"包" など（あればサプリとして粒数UIを表示）
   gramsPerUnit?: number;  // 1粒あたりのg
+  category?: string;      // 食品カテゴリ
 }
 
 export interface FavoriteGroup {
@@ -155,7 +156,7 @@ export const useStore = create<Store>((set, get) => ({
     let next: SavedFood[];
     if (idx >= 0) {
       next = existing.map((f, i) => i === idx
-        ? { ...f, useCount: f.useCount + 1, lastUsed: food.lastUsed, grams: food.grams, isFavorite: food.isFavorite ?? f.isFavorite }
+        ? { ...f, useCount: f.useCount + 1, lastUsed: food.lastUsed, grams: food.grams, isFavorite: food.isFavorite ?? f.isFavorite, category: food.category ?? f.category }
         : f
       );
     } else {

@@ -89,6 +89,24 @@ export default function CalendarPage() {
   const sel = dayMap[selectedDate];
   const selDate = new Date(selectedDate + 'T00:00:00');
 
+  const MEAL_KEYS = [
+    { key: 'breakfast', name: '朝食' },
+    { key: 'lunch', name: '昼食' },
+    { key: 'dinner', name: '夕食' },
+    { key: 'snack', name: '間食' },
+  ];
+  const mealBreakdown = sel ? MEAL_KEYS.map(({ key, name }) => {
+    const entries = sel.entries.filter(e => e.meal === key);
+    if (entries.length === 0) return null;
+    return {
+      name,
+      protein: Math.round(entries.reduce((s, e) => s + e.protein, 0) * 10) / 10,
+      fat: Math.round(entries.reduce((s, e) => s + e.fat, 0) * 10) / 10,
+      carbs: Math.round(entries.reduce((s, e) => s + e.carbs, 0) * 10) / 10,
+      calories: entries.reduce((s, e) => s + e.calories, 0),
+    };
+  }).filter((x): x is NonNullable<typeof x> => x !== null) : [];
+
   function calColor(calories: number) {
     if (!targetCalories || calories === 0) return '';
     const ratio = calories / targetCalories;
@@ -211,6 +229,28 @@ export default function CalendarPage() {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* 食事別PFC内訳グラフ */}
+            {mealBreakdown.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-400 mb-2">食事別PFC内訳</p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={mealBreakdown} margin={{ left: -20, right: 5 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 10 }} unit="g" />
+                    <Tooltip formatter={(v, name) => [`${v}g`, name === 'protein' ? 'タンパク質' : name === 'fat' ? '脂質' : '炭水化物']} />
+                    <Bar dataKey="protein" stackId="a" fill="#60A5FA" name="protein" />
+                    <Bar dataKey="fat" stackId="a" fill="#FBBF24" name="fat" />
+                    <Bar dataKey="carbs" stackId="a" fill="#34D399" name="carbs" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex gap-4 justify-center text-xs text-gray-500 mt-1">
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-400 rounded-sm" />タンパク質</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-yellow-400 rounded-sm" />脂質</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-green-400 rounded-sm" />炭水化物</span>
                 </div>
               </div>
             )}
