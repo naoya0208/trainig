@@ -288,9 +288,14 @@ function ProfileContent() {
           ))}
         </div>
         {goalPurpose === 'beauty' && (
-          <p className="text-xs text-pink-500 mb-4 bg-pink-50 rounded-xl px-3 py-2">
-            ✨ 美容モード：ビタミンE・A・ビオチン・ビタミンB2など美肌・美髪に関わる栄養素も追跡します
-          </p>
+          <div className="mb-4 bg-pink-50 border border-pink-100 rounded-xl px-3 py-3 text-xs text-pink-700 space-y-1.5">
+            <p className="font-semibold">✨ 美容・スキンケアモードで変わること</p>
+            <p>• <strong>PFC比率</strong>：タンパク質1.2g/kg ／ 脂質30%（脂溶性ビタミン吸収・肌の潤い）</p>
+            <p>• <strong>食物繊維</strong>目標 22g→<strong>25g</strong>（腸肌相関・腸内フローラ改善）</p>
+            <p>• <strong>ビタミンC</strong>目標 100mg→<strong>200mg</strong>（コラーゲン合成・抗酸化）</p>
+            {(gender === 'female') && <p>• <strong>鉄分</strong>目標 7.5mg→<strong>10.5mg</strong>（月経による損失を考慮）</p>}
+            <p>• 追加表示：ビタミンE・A・ビオチン・ビタミンB2（美肌・美髪・美爪）</p>
+          </div>
         )}
 
         <label className="text-sm font-semibold text-gray-600 block mb-2">目標の種類</label>

@@ -24,9 +24,18 @@ export const MICRO_DEFS: {
   { key: 'vitaminB2',  label: 'ビタミンB2',  unit: 'mg', target: 1.2,  purpose: 'beauty' },
 ];
 
-/** 表示するMICRO_DEFSをgoalPurposeでフィルタリング */
-export function getActiveMicroDefs(goalPurpose?: string) {
-  return MICRO_DEFS.filter(d => !d.purpose || d.purpose === goalPurpose);
+/** 表示するMICRO_DEFSをgoalPurpose・genderでフィルタリング＆目標値調整 */
+export function getActiveMicroDefs(goalPurpose?: string, gender?: string) {
+  return MICRO_DEFS
+    .filter(d => !d.purpose || d.purpose === goalPurpose)
+    .map(d => {
+      if (goalPurpose !== 'beauty') return d;
+      // 美容モード: 特定栄養素の目標値を調整
+      if (d.key === 'vitaminC') return { ...d, target: 200 }; // コラーゲン合成・抗酸化に重要
+      if (d.key === 'iron' && gender === 'female') return { ...d, target: 10.5 }; // 月経による損失を考慮
+      if (d.key === 'fiber') return { ...d, target: 25 }; // 腸内環境→肌の健康（腸肌相関）
+      return d;
+    });
 }
 
 export function sumMicros(entries: { micros?: MicroNutrients; fiber?: number }[]): MicroNutrients {

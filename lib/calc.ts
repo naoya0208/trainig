@@ -146,20 +146,31 @@ export interface NutritionTargets {
 /** 1日の栄養素目標量を計算 */
 export function calcNutritionTargets(p: Profile): NutritionTargets {
   const { targetCalories } = calcTargetCalories(p);
+  const proteinMax = Math.round(p.weight * 2.5);
+  const fatMax = Math.round((targetCalories * 0.35) / 9);
+  const carbsMax = Math.round((targetCalories * 0.65) / 4);
+
+  if (p.goalPurpose === 'beauty') {
+    // 美容モード: タンパク質1.2g/kg（肌・髪・爪の合成に必要だが過剰不要）
+    // 脂質30%（脂溶性ビタミンE・Aの吸収、皮膚のバリア機能・潤い保持に重要）
+    // 炭水化物: 残りカロリー（低GI食品を優先）
+    const protein = Math.round(p.weight * 1.2);
+    const fat = Math.round((targetCalories * 0.30) / 9);
+    const carbs = Math.round((targetCalories - protein * 4 - fat * 9) / 4);
+    return { protein, proteinMax, fat, fatMax, carbs, carbsMax, fiber: 25 };
+  }
+
+  // 筋肉・標準モード
   // タンパク質: 目標別に設定 / 上限: 体重×2.5g
   // 増量: 筋合成最大化 × 2.0g / 減量: 筋肉維持しながら脂肪減 × 1.6g / 維持: × 1.4g
   const proteinMultiplier = p.goalType === 'gain' ? 2.0 : p.goalType === 'lose' ? 1.6 : 1.4;
   const protein = Math.round(p.weight * proteinMultiplier);
-  const proteinMax = Math.round(p.weight * 2.5);
   // 脂質: 総カロリーの25% / 上限: 35%
   const fat = Math.round((targetCalories * 0.25) / 9);
-  const fatMax = Math.round((targetCalories * 0.35) / 9);
   // 炭水化物: 残りカロリーから計算 / 上限: 総カロリーの65%
   const carbs = Math.round((targetCalories - protein * 4 - fat * 9) / 4);
-  const carbsMax = Math.round((targetCalories * 0.65) / 4);
   // 食物繊維: 22g/日
-  const fiber = 22;
-  return { protein, proteinMax, fat, fatMax, carbs, carbsMax, fiber };
+  return { protein, proteinMax, fat, fatMax, carbs, carbsMax, fiber: 22 };
 }
 
 /** 標準体重・適正体重の目安を返す */

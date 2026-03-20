@@ -106,7 +106,7 @@ export default function CalendarPage() {
     return row;
   }) : [];
 
-  const MICRO_DEFS = getActiveMicroDefs(profile?.goalPurpose);
+  const MICRO_DEFS = getActiveMicroDefs(profile?.goalPurpose, profile?.gender);
 
   function calColor(calories: number) {
     if (!targetCalories || calories === 0) return '';

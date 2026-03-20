@@ -64,7 +64,7 @@ export default function Home() {
   const todayWork = workoutSessions.filter(s => s.date === today);
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
   const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);
-  const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose);
+  const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose, profile.gender);
   const net = consumed - burned;
   const remaining = Math.max(0, targetCalories - net);
   const pct = Math.min(100, Math.round((net / targetCalories) * 100));
@@ -138,6 +138,31 @@ export default function Home() {
       {isUnsafe && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4 text-sm text-yellow-800">
           ⚠️ 設定したペースが速すぎます。目標日の延長をおすすめします。
+        </div>
+      )}
+
+      {/* 美容モードバナー */}
+      {profile.goalPurpose === 'beauty' && (
+        <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-2xl p-4 mb-4">
+          <p className="text-sm font-bold text-pink-600 mb-2">✨ 美容・スキンケアモード</p>
+          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+            <div className="bg-white/70 rounded-xl px-3 py-2">
+              <p className="font-semibold text-pink-500 mb-0.5">脂質目標30%</p>
+              <p>脂溶性ビタミンE・Aの吸収↑<br/>肌の水分バリア機能をサポート</p>
+            </div>
+            <div className="bg-white/70 rounded-xl px-3 py-2">
+              <p className="font-semibold text-pink-500 mb-0.5">タンパク質1.2g/kg</p>
+              <p>コラーゲン・ケラチン合成<br/>肌・髪・爪の材料</p>
+            </div>
+            <div className="bg-white/70 rounded-xl px-3 py-2">
+              <p className="font-semibold text-pink-500 mb-0.5">食物繊維25g</p>
+              <p>腸内環境改善→肌荒れ軽減<br/>（腸肌相関）</p>
+            </div>
+            <div className="bg-white/70 rounded-xl px-3 py-2">
+              <p className="font-semibold text-pink-500 mb-0.5">ビタミンC 200mg</p>
+              <p>コラーゲン合成促進<br/>抗酸化・メラニン抑制</p>
+            </div>
+          </div>
         </div>
       )}
 
