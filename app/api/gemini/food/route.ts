@@ -36,7 +36,11 @@ export async function POST(req: NextRequest) {
           "calcium": カルシウム（mg）,
           "zinc": 亜鉛（mg）,
           "omega3": EPA+DHA（g）,
-          "sodium": ナトリウム（mg）
+          "sodium": ナトリウム（mg）,
+          "vitaminE": ビタミンE（mg）,
+          "vitaminA": ビタミンA（μg）,
+          "biotin": ビオチン（μg）,
+          "vitaminB2": ビタミンB2（mg）
         }
       }
     ]
@@ -81,7 +85,11 @@ export async function POST(req: NextRequest) {
           "calcium": カルシウム（mg）,
           "zinc": 亜鉛（mg）,
           "omega3": EPA+DHA（g）,
-          "sodium": ナトリウム（mg）
+          "sodium": ナトリウム（mg）,
+          "vitaminE": ビタミンE（mg）,
+          "vitaminA": ビタミンA（μg）,
+          "biotin": ビオチン（μg）,
+          "vitaminB2": ビタミンB2（mg）
         }
       }
     ]

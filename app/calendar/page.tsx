@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, LineChart, Line, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, LineChart, Line, Legend } from 'recharts';
 import { useStore, FoodEntry, MicroNutrients } from '@/lib/store';
 import { calcTargetCalories, calcNutritionTargets } from '@/lib/calc';
-import { MICRO_DEFS, sumMicros } from '@/lib/micros';
+import { getActiveMicroDefs, sumMicros } from '@/lib/micros';
 import { localDate } from '@/lib/date';
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
@@ -21,6 +21,13 @@ function getDaysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).get
 function getFirstDow(y: number, m: number) { return new Date(y, m, 1).getDay(); }
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 function dateStr(y: number, m: number, d: number) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+
+const CHART_COLORS = ['#60A5FA','#34D399','#FBBF24','#F87171','#A78BFA','#FB923C','#4ADE80','#F472B6','#38BDF8','#E879F9','#94A3B8'];
+const PFC_KEYS = [
+  { key: 'protein' as const, label: 'P タンパク質' },
+  { key: 'fat'     as const, label: 'F 脂質' },
+  { key: 'carbs'   as const, label: 'C 炭水化物' },
+];
 
 export default function CalendarPage() {
   const { profile, foodEntries, hydrate } = useStore();
@@ -89,11 +96,17 @@ export default function CalendarPage() {
   const sel = dayMap[selectedDate];
   const selDate = new Date(selectedDate + 'T00:00:00');
 
-  const pfcData = sel ? [
-    { name: 'タンパク質', value: sel.protein, target: nutritionTargets?.protein ?? 0, fill: '#60A5FA' },
-    { name: '脂質', value: sel.fat, target: nutritionTargets?.fat ?? 0, fill: '#FBBF24' },
-    { name: '炭水化物', value: sel.carbs, target: nutritionTargets?.carbs ?? 0, fill: '#34D399' },
-  ] : [];
+  // 食品別積み上げグラフ用データ
+  const uniqueFoods = sel ? [...new Set(sel.entries.map(e => e.foodName))] : [];
+  const pfcStackData = sel ? PFC_KEYS.map(({ key, label }) => {
+    const row: Record<string, string | number> = { name: label };
+    for (const foodName of uniqueFoods) {
+      row[foodName] = Math.round(sel.entries.filter(e => e.foodName === foodName).reduce((s, e) => s + e[key], 0) * 10) / 10;
+    }
+    return row;
+  }) : [];
+
+  const MICRO_DEFS = getActiveMicroDefs(profile?.goalPurpose);
 
   function calColor(calories: number) {
     if (!targetCalories || calories === 0) return '';
@@ -221,29 +234,30 @@ export default function CalendarPage() {
               </div>
             )}
 
-            {/* PFC別グラフ */}
-            {sel.calories > 0 && (
+            {/* PFC別・食品積み上げグラフ */}
+            {sel.calories > 0 && uniqueFoods.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-400 mb-2">PFC内訳</p>
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={pfcData} margin={{ left: -20, right: 5 }}>
+                <p className="text-xs font-semibold text-gray-400 mb-2">PFC内訳（食品別）</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={pfcStackData} margin={{ left: -20, right: 5 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 10 }} unit="g" />
-                    <Tooltip formatter={(v) => [`${v}g`, '摂取量']} />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]} name="摂取">
-                      {pfcData.map((entry, i) => (
-                        <Cell key={`cell-${i}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                    {nutritionTargets && pfcData.map((entry, i) => (
-                      <ReferenceLine key={`ref-${i}`} y={entry.target} stroke={entry.fill} strokeDasharray="4 2" opacity={0.5} />
+                    <Tooltip formatter={(v, name) => [`${v}g`, String(name).length > 12 ? String(name).slice(0, 11) + '…' : name]} />
+                    {uniqueFoods.map((foodName, i) => (
+                      <Bar key={foodName} dataKey={foodName} stackId="pfc"
+                        fill={CHART_COLORS[i % CHART_COLORS.length]}
+                        radius={i === uniqueFoods.length - 1 ? [3, 3, 0, 0] : undefined} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="flex gap-4 justify-center text-xs text-gray-500 mt-1">
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-400 rounded-sm" />タンパク質</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-yellow-400 rounded-sm" />脂質</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-green-400 rounded-sm" />炭水化物</span>
+                {/* 食品凡例 */}
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
+                  {uniqueFoods.map((name, i) => (
+                    <span key={name} className="flex items-center gap-1 text-xs text-gray-600">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      {name.length > 10 ? name.slice(0, 9) + '…' : name}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}

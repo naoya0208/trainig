@@ -3,13 +3,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets } from '@/lib/calc';
-import { MICRO_DEFS, sumMicros } from '@/lib/micros';
+import { getActiveMicroDefs, sumMicros } from '@/lib/micros';
 
 import { localDate } from '@/lib/date';
 function getToday() { return localDate(); }
 
 export default function Home() {
-  const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate } = useStore();
+  const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate, setProfile } = useStore();
   const [today, setToday] = useState(getToday);
   const [advice, setAdvice] = useState<{ status: string; message: string; tips: string[] } | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
@@ -18,23 +18,23 @@ export default function Home() {
 
   useEffect(() => {
     hydrate();
-    // 1分ごとに日付チェック → 0時を跨いだら自動更新 + Apple Watchカロリーをリセット
+    // 1分ごとに日付チェック → 0時を跨いだら自動更新
     const timer = setInterval(() => {
-      const now = getToday();
       setToday(prev => {
-        if (prev !== now) {
-          // 日付が変わったらApple Watchカロリーを0にリセット
-          const { profile, setProfile } = useStore.getState();
-          if (profile && profile.appleWatchCalories && profile.appleWatchCalories > 0) {
-            setProfile({ ...profile, appleWatchCalories: 0 });
-          }
-          return now;
-        }
-        return prev;
+        const now = getToday();
+        return prev !== now ? now : prev;
       });
     }, 60_000);
     return () => clearInterval(timer);
   }, []);
+
+  // 日付が変わったらApple Watchカロリーを0にリセット
+  useEffect(() => {
+    if (profile?.appleWatchCalories && profile.appleWatchCalories > 0) {
+      setProfile({ ...profile, appleWatchCalories: 0 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today]);
 
   if (!profile) {
     return (
@@ -63,8 +63,8 @@ export default function Home() {
   const todayFood = foodEntries.filter(e => e.date === today);
   const todayWork = workoutSessions.filter(s => s.date === today);
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
-  // Apple Watch使用中は筋トレカロリーをTDEEに含むためダブルカウントしない
   const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);
+  const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose);
   const net = consumed - burned;
   const remaining = Math.max(0, targetCalories - net);
   const pct = Math.min(100, Math.round((net / targetCalories) * 100));
@@ -351,57 +351,35 @@ export default function Home() {
         )}
       </div>
 
-      {/* 今日のログ */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-sm font-semibold text-gray-500">今日の食事</p>
-            <Link href="/food" className="text-blue-600 text-sm font-semibold">+ 追加</Link>
-          </div>
-          {todayFood.length === 0 ? <p className="text-sm text-gray-300 text-center py-4">まだ記録がありません</p>
-            : todayFood.slice(-3).map(e => {
-              const isFav = savedFoods.some(f => f.foodName === e.foodName && f.isFavorite);
-              return (
-                <div key={e.id} className="flex items-center justify-between py-1.5 text-sm border-b border-gray-50 last:border-0">
-                  <span className="text-gray-600 truncate flex-1">{e.foodName}（{e.grams}g）</span>
-                  <span className="font-semibold ml-2">{e.calories}kcal</span>
-                  <button
-                    onClick={() => saveFoodToHistory({
-                      id: e.id,
-                      foodName: e.foodName,
-                      grams: e.grams,
-                      per100g: {
-                        calories: e.grams > 0 ? Math.round(e.calories / e.grams * 100) : 0,
-                        protein: e.grams > 0 ? parseFloat((e.protein / e.grams * 100).toFixed(1)) : 0,
-                        fat: e.grams > 0 ? parseFloat((e.fat / e.grams * 100).toFixed(1)) : 0,
-                        carbs: e.grams > 0 ? parseFloat((e.carbs / e.grams * 100).toFixed(1)) : 0,
-                      },
-                      isFavorite: true,
-                      lastUsed: e.date,
-                      useCount: 1,
-                    })}
-                    className="ml-2 text-lg leading-none hover:scale-110 transition-transform"
-                    title="お気に入り登録"
-                  >
-                    {isFav ? '★' : '☆'}
-                  </button>
-                </div>
-              );
-            })}
+      {/* 今日の食事ログ */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <div className="flex justify-between items-center mb-3">
+          <p className="text-sm font-semibold text-gray-500">今日の食事</p>
+          <Link href="/food" className="text-blue-600 text-sm font-semibold">+ 追加</Link>
         </div>
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-sm font-semibold text-gray-500">今日のトレーニング</p>
-            <Link href="/workout" className="text-blue-600 text-sm font-semibold">+ 追加</Link>
-          </div>
-          {todayWork.length === 0 ? <p className="text-sm text-gray-300 text-center py-4">まだ記録がありません</p>
-            : todayWork.map(w => (
-              <div key={w.id} className="flex justify-between py-1.5 text-sm border-b border-gray-50 last:border-0">
-                <span className="text-gray-600 truncate">{w.name}（{w.durationMinutes}分）</span>
-                <span className="font-semibold text-blue-600 ml-2">−{w.burnedCalories}kcal</span>
+        {todayFood.length === 0 ? <p className="text-sm text-gray-300 text-center py-4">まだ記録がありません</p>
+          : todayFood.slice(-3).map(e => {
+            const isFav = savedFoods.some(f => f.foodName === e.foodName && f.isFavorite);
+            return (
+              <div key={e.id} className="flex items-center justify-between py-1.5 text-sm border-b border-gray-50 last:border-0">
+                <span className="text-gray-600 truncate flex-1">{e.foodName}（{e.grams}g）</span>
+                <span className="font-semibold ml-2">{e.calories}kcal</span>
+                <button
+                  onClick={() => saveFoodToHistory({
+                    id: e.id, foodName: e.foodName, grams: e.grams,
+                    per100g: {
+                      calories: e.grams > 0 ? Math.round(e.calories / e.grams * 100) : 0,
+                      protein: e.grams > 0 ? parseFloat((e.protein / e.grams * 100).toFixed(1)) : 0,
+                      fat: e.grams > 0 ? parseFloat((e.fat / e.grams * 100).toFixed(1)) : 0,
+                      carbs: e.grams > 0 ? parseFloat((e.carbs / e.grams * 100).toFixed(1)) : 0,
+                    },
+                    isFavorite: true, lastUsed: e.date, useCount: 1,
+                  })}
+                  className="ml-2 text-lg leading-none hover:scale-110 transition-transform"
+                >{isFav ? '★' : '☆'}</button>
               </div>
-            ))}
-        </div>
+            );
+          })}
       </div>
     </div>
   );

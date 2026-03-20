@@ -5,7 +5,8 @@ export const MICRO_DEFS: {
   label: string;
   unit: string;
   target: number;
-  isLimit?: boolean; // trueなら上限（ナトリウム等）
+  isLimit?: boolean;
+  purpose?: 'beauty' | 'muscle'; // 指定なし = 常時表示
 }[] = [
   { key: 'fiber',      label: '食物繊維',    unit: 'g',  target: 22 },
   { key: 'vitaminD',   label: 'ビタミンD',   unit: 'μg', target: 8.5 },
@@ -16,7 +17,17 @@ export const MICRO_DEFS: {
   { key: 'zinc',       label: '亜鉛',        unit: 'mg', target: 10 },
   { key: 'omega3',     label: 'EPA+DHA',     unit: 'g',  target: 2.0 },
   { key: 'sodium',     label: 'ナトリウム',  unit: 'mg', target: 2000, isLimit: true },
+  // 美容向け（goalPurpose === 'beauty' のときのみ表示）
+  { key: 'vitaminE',   label: 'ビタミンE',   unit: 'mg', target: 6.0,  purpose: 'beauty' },
+  { key: 'vitaminA',   label: 'ビタミンA',   unit: 'μg', target: 700,  purpose: 'beauty' },
+  { key: 'biotin',     label: 'ビオチン',    unit: 'μg', target: 50,   purpose: 'beauty' },
+  { key: 'vitaminB2',  label: 'ビタミンB2',  unit: 'mg', target: 1.2,  purpose: 'beauty' },
 ];
+
+/** 表示するMICRO_DEFSをgoalPurposeでフィルタリング */
+export function getActiveMicroDefs(goalPurpose?: string) {
+  return MICRO_DEFS.filter(d => !d.purpose || d.purpose === goalPurpose);
+}
 
 export function sumMicros(entries: { micros?: MicroNutrients; fiber?: number }[]): MicroNutrients {
   const result: MicroNutrients = {};

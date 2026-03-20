@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { Profile, ActivityLevel, GoalType, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight } from '@/lib/calc';
+import { Profile, ActivityLevel, GoalType, GoalPurpose, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight } from '@/lib/calc';
 import { localDate } from '@/lib/date';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
@@ -26,6 +26,7 @@ function ProfileContent() {
   const [bodyFat, setBodyFat] = useState('');
   const [activity, setActivity] = useState<ActivityLevel>(1.55);
   const [goalType, setGoalType] = useState<GoalType>('lose');
+  const [goalPurpose, setGoalPurpose] = useState<GoalPurpose | undefined>(undefined);
   const [targetDate, setTargetDate] = useState('');
   const [appleWatch, setAppleWatch] = useState('');
   const [aiAdvice, setAiAdvice] = useState<any>(null);
@@ -67,6 +68,7 @@ function ProfileContent() {
       setBodyFat(profile.bodyFatPercent?.toString() ?? '');
       setActivity(profile.activityLevel);
       setGoalType(profile.goalType);
+      setGoalPurpose(profile.goalPurpose);
       setTargetDate(profile.targetDate ?? '');
       setAppleWatch(profile.appleWatchCalories?.toString() ?? '');
     }
@@ -87,6 +89,7 @@ function ProfileContent() {
       activityLevel: activity, goalType,
       targetDate: targetDate || undefined,
       appleWatchCalories: parseFloat(appleWatch) || undefined,
+      goalPurpose,
     };
   })();
 
@@ -271,6 +274,25 @@ function ProfileContent() {
       {/* 目標設定 */}
       <div className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
         <h2 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">目標設定</h2>
+
+        <label className="text-sm font-semibold text-gray-600 block mb-2">重視する目的</label>
+        <div className="flex gap-2 mb-4">
+          {([
+            ['muscle', '💪 筋肉・パフォーマンス'],
+            ['beauty', '✨ 美容・スキンケア'],
+          ] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setGoalPurpose(goalPurpose === v ? undefined : v)}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${goalPurpose === v ? (v === 'beauty' ? 'bg-pink-500 text-white' : 'bg-blue-600 text-white') : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {goalPurpose === 'beauty' && (
+          <p className="text-xs text-pink-500 mb-4 bg-pink-50 rounded-xl px-3 py-2">
+            ✨ 美容モード：ビタミンE・A・ビオチン・ビタミンB2など美肌・美髪に関わる栄養素も追跡します
+          </p>
+        )}
+
         <label className="text-sm font-semibold text-gray-600 block mb-2">目標の種類</label>
         <div className="flex gap-2 mb-4">
           {([['lose','減量'],['maintain','維持'],['gain','増量']] as const).map(([v,l]) => (

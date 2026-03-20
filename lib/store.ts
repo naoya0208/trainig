@@ -13,6 +13,11 @@ export interface MicroNutrients {
   zinc?: number;       // 亜鉛 mg
   omega3?: number;     // EPA+DHA g
   sodium?: number;     // ナトリウム mg
+  // 美容向け
+  vitaminE?: number;   // ビタミンE mg
+  vitaminA?: number;   // ビタミンA μg
+  biotin?: number;     // ビオチン μg
+  vitaminB2?: number;  // ビタミンB2 mg
 }
 
 export interface FoodEntry {

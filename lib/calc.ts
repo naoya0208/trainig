@@ -1,6 +1,7 @@
 export type Gender = 'male' | 'female' | 'other';
 export type ActivityLevel = 1.2 | 1.375 | 1.55 | 1.725 | 1.9;
 export type GoalType = 'lose' | 'maintain' | 'gain';
+export type GoalPurpose = 'muscle' | 'beauty';
 
 export interface Profile {
   gender: Gender;
@@ -14,6 +15,7 @@ export interface Profile {
   goalType: GoalType;
   targetDate?: string;
   appleWatchCalories?: number; // Apple Watch手動入力
+  goalPurpose?: GoalPurpose;   // 重視する目的（筋肉 or 美容）
 }
 
 /** 目標体脂肪率が設定されている場合は除脂肪体重維持で目標体重を算出 */
