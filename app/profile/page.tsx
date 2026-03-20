@@ -29,6 +29,7 @@ function ProfileContent() {
   const [goalPurpose, setGoalPurpose] = useState<GoalPurpose | undefined>(undefined);
   const [targetDate, setTargetDate] = useState('');
   const [appleWatch, setAppleWatch] = useState('');
+  const [hasAppleWatch, setHasAppleWatch] = useState<boolean | undefined>(undefined);
   const [aiAdvice, setAiAdvice] = useState<any>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -71,6 +72,7 @@ function ProfileContent() {
       setGoalPurpose(profile.goalPurpose);
       setTargetDate(profile.targetDate ?? '');
       setAppleWatch(profile.appleWatchCalories?.toString() ?? '');
+      setHasAppleWatch(profile.hasAppleWatch);
     }
   }, [profile]);
 
@@ -89,6 +91,7 @@ function ProfileContent() {
       activityLevel: activity, goalType,
       targetDate: targetDate || undefined,
       appleWatchCalories: parseFloat(appleWatch) || undefined,
+      hasAppleWatch,
       goalPurpose,
     };
   })();
@@ -319,38 +322,77 @@ function ProfileContent() {
 
       {/* Apple Watch連携 */}
       <div className="bg-gray-900 rounded-2xl p-6 mb-4 text-white">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl">⌚</span>
           <div>
-            <h2 className="font-bold">Apple Watch 連携</h2>
-            <p className="text-xs text-gray-400">Shortcutで自動連携 または 手動入力</p>
+            <h2 className="font-bold">消費カロリーの計測</h2>
+            <p className="text-xs text-gray-400">Apple Watchの有無で計算方法が変わります</p>
           </div>
         </div>
 
-        {/* 自動連携説明 */}
-        <div className="bg-gray-800 rounded-xl p-3 mb-3">
-          <p className="text-xs text-blue-300 font-semibold mb-2">⚡ Shortcutsで自動連携する方法</p>
-          <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
-            <li>iPhoneの「ショートカット」アプリを開く</li>
-            <li>新規ショートカットを作成</li>
-            <li>「ヘルスケア」→「ヘルスケアサンプルを検索」を追加
-              <br/><span className="ml-4 text-gray-500">種類: アクティブエネルギー消費量</span></li>
-            <li>同様に「安静時エネルギー」も取得</li>
-            <li>「計算」で2つを合計</li>
-            <li>「URLを開く」を追加:
-              <br/><span className="ml-4 text-blue-400 break-all">https://calorie-web-theta.vercel.app/api/apple-watch?calories=[合計値]</span></li>
-          </ol>
-          <p className="text-xs text-gray-500 mt-2">★ オートメーションで毎朝自動実行すると便利です</p>
+        {/* Apple Watch有無の確認 */}
+        <p className="text-xs text-gray-400 mb-2">Apple Watchをお持ちですか？</p>
+        <div className="flex gap-2 mb-4">
+          {([
+            [true,  '⌚ 持っている'],
+            [false, '📱 持っていない'],
+          ] as const).map(([v, l]) => (
+            <button key={String(v)} onClick={() => setHasAppleWatch(v)}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${hasAppleWatch === v ? (v ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white') : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+              {l}
+            </button>
+          ))}
         </div>
 
-        <p className="text-xs text-gray-400 mb-2">手動入力（今日の合計消費カロリー）</p>
-        <div className="flex items-center gap-2 bg-gray-800 rounded-xl px-4">
-          <input className="flex-1 py-3 text-xl font-bold bg-transparent focus:outline-none text-white placeholder-gray-600"
-            type="number" placeholder="2500" value={appleWatch} onChange={e => setAppleWatch(e.target.value)} />
-          <span className="text-gray-400 text-sm">kcal/日</span>
-        </div>
-        {appleWatch && parseFloat(appleWatch) > 0 && (
-          <p className="text-xs text-green-400 mt-2">✓ Apple Watch実測値を使用します（TDEE推定値より優先）</p>
+        {/* Apple Watchなし → TDEEモード説明 */}
+        {hasAppleWatch === false && (
+          <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-green-400">✓ TDEE推定モードで管理します</p>
+            <p className="text-xs text-gray-400">
+              Apple Watchがなくても大丈夫です。「活動量」の設定から1日の消費カロリーを自動推定（TDEE）し、目標摂取カロリーを計算します。
+            </p>
+            <div className="bg-gray-700 rounded-xl p-3 text-xs text-gray-300 space-y-1.5">
+              <p className="font-semibold text-white mb-1">TDEEモードで正確に管理するコツ</p>
+              <p>• 活動量を正直に設定する（過大評価しがち）</p>
+              <p>• 体重の増減を週1回記録して活動量を微調整する</p>
+              <p>• 運動した日は食事タブから「運動記録」で追加消費を記録できる</p>
+            </div>
+            <p className="text-xs text-gray-500">体重が目標通りに変化しない場合は、活動量レベルを1段階下げて試してみてください。</p>
+          </div>
+        )}
+
+        {/* Apple Watchあり → 連携方法 */}
+        {hasAppleWatch === true && (
+          <>
+            <div className="bg-gray-800 rounded-xl p-3 mb-3">
+              <p className="text-xs text-blue-300 font-semibold mb-2">⚡ Shortcutsで自動連携する方法</p>
+              <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
+                <li>iPhoneの「ショートカット」アプリを開く</li>
+                <li>新規ショートカットを作成</li>
+                <li>「ヘルスケア」→「ヘルスケアサンプルを検索」を追加
+                  <br/><span className="ml-4 text-gray-500">種類: アクティブエネルギー消費量</span></li>
+                <li>同様に「安静時エネルギー」も取得</li>
+                <li>「計算」で2つを合計</li>
+                <li>「URLを開く」を追加:
+                  <br/><span className="ml-4 text-blue-400 break-all">https://calorie-web-theta.vercel.app/api/apple-watch?calories=[合計値]</span></li>
+              </ol>
+              <p className="text-xs text-gray-500 mt-2">★ オートメーションで毎朝自動実行すると便利です</p>
+            </div>
+            <p className="text-xs text-gray-400 mb-2">手動入力（今日の合計消費カロリー）</p>
+            <div className="flex items-center gap-2 bg-gray-800 rounded-xl px-4">
+              <input className="flex-1 py-3 text-xl font-bold bg-transparent focus:outline-none text-white placeholder-gray-600"
+                type="number" placeholder="2500" value={appleWatch} onChange={e => setAppleWatch(e.target.value)} />
+              <span className="text-gray-400 text-sm">kcal/日</span>
+            </div>
+            {appleWatch && parseFloat(appleWatch) > 0 && (
+              <p className="text-xs text-green-400 mt-2">✓ Apple Watch実測値を使用します（TDEE推定値より優先）</p>
+            )}
+          </>
+        )}
+
+        {/* 未選択 */}
+        {hasAppleWatch === undefined && (
+          <p className="text-xs text-gray-500 text-center py-2">上のボタンで選択してください</p>
         )}
       </div>
 

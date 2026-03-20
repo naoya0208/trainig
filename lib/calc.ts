@@ -15,6 +15,7 @@ export interface Profile {
   goalType: GoalType;
   targetDate?: string;
   appleWatchCalories?: number; // Apple Watch手動入力
+  hasAppleWatch?: boolean;     // Apple Watch所持確認
   goalPurpose?: GoalPurpose;   // 重視する目的（筋肉 or 美容）
 }
 

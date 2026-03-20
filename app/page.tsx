@@ -166,8 +166,17 @@ export default function Home() {
         </div>
       )}
 
-      {/* Apple Watch */}
-      {appleWatchActive && (
+      {/* Apple Watch未設定の場合は設定促し */}
+      {profile.hasAppleWatch === undefined && !appleWatchActive && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-4 flex items-center gap-3">
+          <span className="text-xl">⌚</span>
+          <p className="text-xs text-amber-700 flex-1">Apple Watchの有無を設定すると、消費カロリーの管理方法が最適化されます</p>
+          <Link href="/profile" className="text-xs text-amber-600 font-semibold hover:text-amber-800 flex-shrink-0">設定 →</Link>
+        </div>
+      )}
+
+      {/* Apple Watch / TDEE状態バナー */}
+      {appleWatchActive ? (
         <div className="bg-gray-900 text-white rounded-2xl p-4 mb-4 flex items-center gap-3">
           <span className="text-2xl">⌚</span>
           <div>
@@ -176,7 +185,16 @@ export default function Home() {
           </div>
           <Link href="/profile" className="ml-auto text-xs text-gray-400 hover:text-white">更新 →</Link>
         </div>
-      )}
+      ) : profile.hasAppleWatch === false ? (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-4 flex items-center gap-3">
+          <span className="text-2xl">📊</span>
+          <div>
+            <p className="text-xs text-blue-500 font-semibold">TDEE推定モードで管理中</p>
+            <p className="text-xs text-gray-500 mt-0.5">消費カロリーは活動量から自動推定しています（{tdee.toLocaleString()} kcal/日）</p>
+          </div>
+          <Link href="/profile" className="ml-auto text-xs text-blue-400 hover:text-blue-600 flex-shrink-0">設定 →</Link>
+        </div>
+      ) : null}
 
       {/* カロリーゲージ */}
       <div className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
@@ -185,9 +203,15 @@ export default function Home() {
           <div><p className="text-2xl font-bold">{net.toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">摂取</p></div>
           <div>
             <p className="text-2xl font-bold text-blue-500">
-              {appleWatchActive ? profile.appleWatchCalories?.toLocaleString() : burned.toLocaleString()}
+              {appleWatchActive
+                ? profile.appleWatchCalories?.toLocaleString()
+                : profile.hasAppleWatch === false
+                  ? tdee.toLocaleString()
+                  : burned.toLocaleString()}
             </p>
-            <p className="text-xs text-gray-400 mt-1">{appleWatchActive ? '⌚ 総消費' : '運動消費'}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {appleWatchActive ? '⌚ 総消費' : profile.hasAppleWatch === false ? 'TDEE推定' : '運動消費'}
+            </p>
           </div>
           <div><p className="text-2xl font-bold">{targetCalories.toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">目標</p></div>
         </div>
@@ -227,7 +251,7 @@ export default function Home() {
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: '基礎代謝', val: bmr.toLocaleString(), unit: 'kcal', sub: profile.bodyFatPercent ? 'Katch-McArdle' : 'Mifflin式', cls: 'text-gray-900' },
-          { label: '総消費', val: tdee.toLocaleString(), unit: 'kcal', sub: appleWatchActive ? '⌚ 実測値' : 'TDEE推定値', cls: 'text-gray-900' },
+          { label: '総消費', val: tdee.toLocaleString(), unit: 'kcal', sub: appleWatchActive ? '⌚ 実測値' : profile.hasAppleWatch === false ? '📊 TDEE推定' : 'TDEE推定値', cls: 'text-gray-900' },
           { label: 'BMI', val: String(bmi), unit: '', sub: bmiStatus.label, cls: bmiStatus.color },
         ].map(item => (
           <div key={item.label} className="bg-white rounded-2xl p-4 shadow-sm text-center">
