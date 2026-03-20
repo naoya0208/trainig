@@ -18,10 +18,20 @@ export default function Home() {
 
   useEffect(() => {
     hydrate();
-    // 1分ごとに日付チェック → 0時を跨いだら自動更新
+    // 1分ごとに日付チェック → 0時を跨いだら自動更新 + Apple Watchカロリーをリセット
     const timer = setInterval(() => {
       const now = getToday();
-      setToday(prev => prev !== now ? now : prev);
+      setToday(prev => {
+        if (prev !== now) {
+          // 日付が変わったらApple Watchカロリーを0にリセット
+          const { profile, setProfile } = useStore.getState();
+          if (profile && profile.appleWatchCalories && profile.appleWatchCalories > 0) {
+            setProfile({ ...profile, appleWatchCalories: 0 });
+          }
+          return now;
+        }
+        return prev;
+      });
     }, 60_000);
     return () => clearInterval(timer);
   }, []);

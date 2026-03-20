@@ -105,11 +105,12 @@ function CountInput({ value, onChange, unit }: { value: number; onChange: (v: nu
 
 interface SupplementInfo { servingUnit: string; gramsPerUnit: number; }
 
-function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
+function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement, isAdded }: {
   food: AIFood; meal: string;
   onAdd: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
   onSaveFavorite: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
   isSupplement?: boolean;
+  isAdded?: boolean;
 }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>(food.ingredients);
   const [baseIngredients, setBaseIngredients] = useState<Ingredient[]>(food.ingredients);
@@ -259,8 +260,8 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement }: {
               ★ お気に入りに保存
             </button>
             <button onClick={() => onAdd(food, displayIngredients, suppInfo, category)}
-              className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold transition ${isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {MEAL_LABELS[meal]}に追加
+              className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold transition ${isAdded ? 'bg-green-500' : isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+              {isAdded ? '✓ 追加済み' : `${MEAL_LABELS[meal]}に追加`}
             </button>
           </div>
         );
@@ -398,12 +399,21 @@ export default function FoodPage() {
   const [eatTime, setEatTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [eatDate, setEatDate] = useState(() => todayStr());
   const [results, setResults] = useState<AIFood[]>([]);
+  const [addedFoods, setAddedFoods] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchMode, setSearchMode] = useState<'food' | 'supplement'>('food');
   // グループ管理
   const [newGroupName, setNewGroupName] = useState('');
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set([...FOOD_CATEGORIES]));
+  function toggleCategory(cat: string) {
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  }
 
   useEffect(() => { hydrate(); }, []);
 
@@ -413,24 +423,25 @@ export default function FoodPage() {
   const favorites = savedFoods.filter(f => f.isFavorite);
   const history = [...savedFoods].sort((a, b) => b.lastUsed.localeCompare(a.lastUsed));
 
-  // カテゴリ別お気に入り（FOOD_CATEGORIESの順序で表示）
-  const favsByCategory: Record<string, SavedFood[]> = {};
-  for (const f of favorites) {
+  // 全保存食品をカテゴリ×★で分類
+  const allByCategory: Record<string, { favs: SavedFood[]; others: SavedFood[] }> = {};
+  for (const f of savedFoods) {
     const cat = f.category || 'その他';
-    if (!favsByCategory[cat]) favsByCategory[cat] = [];
-    favsByCategory[cat].push(f);
+    if (!allByCategory[cat]) allByCategory[cat] = { favs: [], others: [] };
+    if (f.isFavorite) allByCategory[cat].favs.push(f);
+    else allByCategory[cat].others.push(f);
   }
-  const categoriesWithFavs = FOOD_CATEGORIES.filter(c => favsByCategory[c]?.length);
-  // FOOD_CATEGORIESに含まれないカテゴリも表示（将来の拡張に対応）
-  const otherCats = Object.keys(favsByCategory).filter(c => !(FOOD_CATEGORIES as readonly string[]).includes(c));
-  const displayCategories = [...categoriesWithFavs, ...otherCats];
+  const displayCategoriesAll = [
+    ...FOOD_CATEGORIES.filter(c => allByCategory[c]),
+    ...Object.keys(allByCategory).filter(c => !(FOOD_CATEGORIES as readonly string[]).includes(c)),
+  ];
 
   const now = new Date(); const hour = now.getHours();
   const nextProteinTiming = hour < 10 ? { time: '朝食', suggestion: '朝食でタンパク質を摂りましょう' } : hour < 13 ? { time: '昼食', suggestion: '昼食でタンパク質を摂りましょう' } : hour < 16 ? { time: '間食（14〜16時）', suggestion: 'プロテインや乳製品で補給を' } : hour < 19 ? { time: '夕食', suggestion: '夕食でタンパク質を摂りましょう' } : hour < 22 ? { time: '夕食後間食', suggestion: 'カゼインプロテインや乳製品を' } : null;
 
   async function handleSearch() {
     if (!query.trim()) return;
-    setLoading(true); setError(''); setResults([]);
+    setLoading(true); setError(''); setResults([]); setAddedFoods(new Set());
     try {
       const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, mode: searchMode }) });
       const data = await res.json();
@@ -454,13 +465,12 @@ export default function FoodPage() {
     const totals = sumIngredients(ingredients);
     addFood(buildEntry(food.name, totals, food.note));
     saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo, category));
-    setResults([]); setQuery('');
+    setAddedFoods(prev => new Set([...prev, food.name]));
   }
 
   function handleSaveFavorite(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) {
     saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo, category));
-    setResults([]); setQuery('');
-    setTab('favorites');
+    setAddedFoods(prev => new Set([...prev, food.name]));
   }
 
   function handleAddSaved(saved: SavedFood, grams: number) {
@@ -569,9 +579,15 @@ export default function FoodPage() {
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {results.length > 0 && (
             <div className="mt-4 space-y-4">
-              <p className="text-sm font-semibold text-gray-500">検索結果</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-500">検索結果（{results.length}件）</p>
+                <button onClick={() => { setResults([]); setAddedFoods(new Set()); }}
+                  className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg border border-gray-200">
+                  ✕ クリア
+                </button>
+              </div>
               {results.map((food, i) => (
-                <EditableFoodCard key={i} food={food} meal={meal} onAdd={handleAddFood} onSaveFavorite={handleSaveFavorite} isSupplement={searchMode === 'supplement'} />
+                <EditableFoodCard key={i} food={food} meal={meal} onAdd={handleAddFood} onSaveFavorite={handleSaveFavorite} isSupplement={searchMode === 'supplement'} isAdded={addedFoods.has(food.name)} />
               ))}
             </div>
           )}
@@ -669,19 +685,44 @@ export default function FoodPage() {
             </div>
           </div>
 
-          {/* お気に入りリスト（カテゴリ別） */}
-          {favorites.length === 0 ? (
-            <div className="bg-white rounded-2xl p-6 shadow-sm text-center text-gray-300 py-8">
-              お気に入りがありません<br/><span className="text-sm">AI検索の「★お気に入りに保存」で追加</span>
+          {/* カテゴリ別一覧（全保存食品） */}
+          {savedFoods.length === 0 ? (
+            <div className="bg-white rounded-2xl p-6 shadow-sm text-center text-gray-300">
+              食品がありません<br/><span className="text-sm">AI検索から追加してください</span>
             </div>
-          ) : displayCategories.map(cat => (
-            <div key={cat} className="bg-white rounded-2xl p-4 shadow-sm">
-              <p className="text-sm font-semibold text-gray-600 mb-2">{cat}</p>
-              {(favsByCategory[cat] ?? []).map(f => (
-                <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />
-              ))}
-            </div>
-          ))}
+          ) : displayCategoriesAll.map(cat => {
+            const { favs, others } = allByCategory[cat] ?? { favs: [], others: [] };
+            const isOpen = openCategories.has(cat);
+            const total = favs.length + others.length;
+            return (
+              <div key={cat} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <button onClick={() => toggleCategory(cat)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
+                  <span className="text-sm font-semibold text-gray-700">{cat}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{total}品</span>
+                    <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-3 border-t border-gray-50">
+                    {favs.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-semibold text-yellow-500 mb-1">★ いいね</p>
+                        {favs.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+                      </div>
+                    )}
+                    {others.length > 0 && (
+                      <div className={favs.length > 0 ? 'mt-3 pt-2 border-t border-gray-100' : 'mt-2'}>
+                        {favs.length > 0 && <p className="text-xs font-semibold text-gray-400 mb-1">その他</p>}
+                        {others.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
