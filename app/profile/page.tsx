@@ -28,6 +28,7 @@ function ProfileContent() {
   const [goalType, setGoalType] = useState<GoalType>('lose');
   const [goalPurpose, setGoalPurpose] = useState<GoalPurpose | undefined>(undefined);
   const [targetDate, setTargetDate] = useState('');
+  const [manualBMR, setManualBMR] = useState('');
   const [appleWatch, setAppleWatch] = useState('');
   const [hasAppleWatch, setHasAppleWatch] = useState<boolean | undefined>(undefined);
   const [aiAdvice, setAiAdvice] = useState<any>(null);
@@ -71,6 +72,7 @@ function ProfileContent() {
       setGoalType(profile.goalType);
       setGoalPurpose(profile.goalPurpose);
       setTargetDate(profile.targetDate ?? '');
+      setManualBMR(profile.manualBMR?.toString() ?? '');
       setAppleWatch(profile.appleWatchCalories?.toString() ?? '');
       setHasAppleWatch(profile.hasAppleWatch);
     }
@@ -90,6 +92,7 @@ function ProfileContent() {
       bodyFatPercent: parseFloat(bodyFat) || undefined,
       activityLevel: activity, goalType,
       targetDate: targetDate || undefined,
+      manualBMR: parseFloat(manualBMR) || undefined,
       appleWatchCalories: parseFloat(appleWatch) || undefined,
       hasAppleWatch,
       goalPurpose,
@@ -194,16 +197,33 @@ function ProfileContent() {
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-semibold text-gray-600 block mb-1">
-            体脂肪率 <span className="font-normal text-gray-400 text-xs">（任意 — より精度の高いBMR計算に使用）</span>
-          </label>
-          <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3 max-w-40">
-            <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
-              type="number" placeholder="20.0" value={bodyFat} onChange={e => setBodyFat(e.target.value)} />
-            <span className="text-sm text-gray-400">%</span>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-semibold text-gray-600 block mb-1">
+              体脂肪率 <span className="font-normal text-gray-400 text-xs">（任意）</span>
+            </label>
+            <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
+              <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
+                type="number" placeholder="20.0" value={bodyFat} onChange={e => setBodyFat(e.target.value)} />
+              <span className="text-sm text-gray-400">%</span>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-gray-600 block mb-1">
+              基礎代謝 <span className="font-normal text-gray-400 text-xs">（体組成計の実測値）</span>
+            </label>
+            <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
+              <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
+                type="number" placeholder="1400" value={manualBMR} onChange={e => setManualBMR(e.target.value)} />
+              <span className="text-sm text-gray-400">kcal</span>
+            </div>
           </div>
         </div>
+        {manualBMR && parseFloat(manualBMR) > 0 && (
+          <p className="text-xs text-blue-500 mt-2 bg-blue-50 rounded-xl px-3 py-2">
+            ✓ 体組成計の実測BMR（{parseFloat(manualBMR).toLocaleString()}kcal）を使用します。計算式より優先されます。
+          </p>
+        )}
       </div>
 
       {/* 目標体重ガイド */}
@@ -404,7 +424,7 @@ function ProfileContent() {
             <div>
               <p className="text-xl font-bold text-gray-900">{bmr.toLocaleString()}</p>
               <p className="text-xs text-gray-400 mt-0.5">基礎代謝 kcal</p>
-              <p className="text-xs text-blue-500">{preview?.bodyFatPercent ? 'Katch-McArdle' : 'Mifflin式'}</p>
+              <p className="text-xs text-blue-500">{preview?.manualBMR ? '体組成計実測' : preview?.bodyFatPercent ? 'Katch-McArdle' : 'Mifflin式'}</p>
             </div>
             <div>
               <p className="text-xl font-bold text-gray-900">{tdee.toLocaleString()}</p>

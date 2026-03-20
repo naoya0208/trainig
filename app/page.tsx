@@ -250,7 +250,7 @@ export default function Home() {
       {/* BMR・TDEE・BMI */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: '基礎代謝', val: bmr.toLocaleString(), unit: 'kcal', sub: profile.bodyFatPercent ? 'Katch-McArdle' : 'Mifflin式', cls: 'text-gray-900' },
+          { label: '基礎代謝', val: bmr.toLocaleString(), unit: 'kcal', sub: profile.manualBMR ? '体組成計実測' : profile.bodyFatPercent ? 'Katch-McArdle' : 'Mifflin式', cls: 'text-gray-900' },
           { label: '総消費', val: tdee.toLocaleString(), unit: 'kcal', sub: appleWatchActive ? '⌚ 実測値' : profile.hasAppleWatch === false ? '📊 TDEE推定' : 'TDEE推定値', cls: 'text-gray-900' },
           { label: 'BMI', val: String(bmi), unit: '', sub: bmiStatus.label, cls: bmiStatus.color },
         ].map(item => (

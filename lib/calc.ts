@@ -16,6 +16,7 @@ export interface Profile {
   targetDate?: string;
   appleWatchCalories?: number; // Apple Watch手動入力
   hasAppleWatch?: boolean;     // Apple Watch所持確認
+  manualBMR?: number;          // 体組成計などによる基礎代謝手動入力
   goalPurpose?: GoalPurpose;   // 重視する目的（筋肉 or 美容）
 }
 
@@ -29,10 +30,14 @@ export function getEffectiveTargetWeight(p: Profile): number {
 }
 
 export function calcBMR(p: Profile): number {
+  // 手動入力値（体組成計）を優先
+  if (p.manualBMR && p.manualBMR > 0) return p.manualBMR;
+  // 体脂肪率がある場合はKatch-McArdle式
   if (p.bodyFatPercent != null) {
     const lbm = p.weight * (1 - p.bodyFatPercent / 100);
     return Math.round(370 + 21.6 * lbm);
   }
+  // フォールバック: Mifflin式
   const base = 10 * p.weight + 6.25 * p.height - 5 * p.age;
   if (p.gender === 'male') return Math.round(base + 5);
   if (p.gender === 'female') return Math.round(base - 161);
