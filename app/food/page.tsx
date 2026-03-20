@@ -406,7 +406,7 @@ export default function FoodPage() {
   // グループ管理
   const [newGroupName, setNewGroupName] = useState('');
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set([...FOOD_CATEGORIES]));
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(['__favs__', ...FOOD_CATEGORIES]));
   function toggleCategory(cat: string) {
     setOpenCategories(prev => {
       const next = new Set(prev);
@@ -423,13 +423,12 @@ export default function FoodPage() {
   const favorites = savedFoods.filter(f => f.isFavorite);
   const history = [...savedFoods].sort((a, b) => b.lastUsed.localeCompare(a.lastUsed));
 
-  // 全保存食品をカテゴリ×★で分類
-  const allByCategory: Record<string, { favs: SavedFood[]; others: SavedFood[] }> = {};
+  // 全保存食品をカテゴリ別に分類（フラット）
+  const allByCategory: Record<string, SavedFood[]> = {};
   for (const f of savedFoods) {
     const cat = f.category || 'その他';
-    if (!allByCategory[cat]) allByCategory[cat] = { favs: [], others: [] };
-    if (f.isFavorite) allByCategory[cat].favs.push(f);
-    else allByCategory[cat].others.push(f);
+    if (!allByCategory[cat]) allByCategory[cat] = [];
+    allByCategory[cat].push(f);
   }
   const displayCategoriesAll = [
     ...FOOD_CATEGORIES.filter(c => allByCategory[c]),
@@ -685,39 +684,53 @@ export default function FoodPage() {
             </div>
           </div>
 
-          {/* カテゴリ別一覧（全保存食品） */}
+          {/* ★ いいね（全カテゴリ横断） */}
+          {(() => {
+            const isOpen = openCategories.has('__favs__');
+            return (
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <button onClick={() => toggleCategory('__favs__')}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-yellow-50 transition">
+                  <span className="text-sm font-semibold text-yellow-600">★ いいね</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{favorites.length}品</span>
+                    <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-3 border-t border-yellow-50">
+                    {favorites.length === 0
+                      ? <p className="text-center text-gray-300 py-4 text-sm">★をつけた食品がありません</p>
+                      : favorites.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* カテゴリ別一覧（全保存食品・フラット） */}
           {savedFoods.length === 0 ? (
             <div className="bg-white rounded-2xl p-6 shadow-sm text-center text-gray-300">
               食品がありません<br/><span className="text-sm">AI検索から追加してください</span>
             </div>
           ) : displayCategoriesAll.map(cat => {
-            const { favs, others } = allByCategory[cat] ?? { favs: [], others: [] };
+            const items = allByCategory[cat] ?? [];
             const isOpen = openCategories.has(cat);
-            const total = favs.length + others.length;
             return (
               <div key={cat} className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 <button onClick={() => toggleCategory(cat)}
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
                   <span className="text-sm font-semibold text-gray-700">{cat}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{total}品</span>
+                    <span className="text-xs text-gray-400">{items.length}品</span>
                     <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
                   </div>
                 </button>
                 {isOpen && (
                   <div className="px-4 pb-3 border-t border-gray-50">
-                    {favs.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs font-semibold text-yellow-500 mb-1">★ いいね</p>
-                        {favs.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
-                      </div>
-                    )}
-                    {others.length > 0 && (
-                      <div className={favs.length > 0 ? 'mt-3 pt-2 border-t border-gray-100' : 'mt-2'}>
-                        {favs.length > 0 && <p className="text-xs font-semibold text-gray-400 mb-1">その他</p>}
-                        {others.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
-                      </div>
-                    )}
+                    <div className="mt-2">
+                      {items.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+                    </div>
                   </div>
                 )}
               </div>
