@@ -229,18 +229,21 @@ export default function CalendarPage() {
                   <BarChart data={pfcData} margin={{ left: -20, right: 5 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 10 }} unit="g" />
-                    <Tooltip formatter={(v, key) => [`${v}g`, key === 'value' ? '摂取' : '目標']} />
-                    <Bar dataKey="target" fill="#E5E7EB" radius={[3, 3, 0, 0]} name="目標" />
-                    <Bar dataKey="value" radius={[3, 3, 0, 0]} name="摂取">
-                      {pfcData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                    <Tooltip formatter={(v) => [`${v}g`, '摂取量']} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} name="摂取">
+                      {pfcData.map((entry, i) => (
+                        <Cell key={`cell-${i}`} fill={entry.fill} />
+                      ))}
                     </Bar>
+                    {nutritionTargets && pfcData.map((entry, i) => (
+                      <ReferenceLine key={`ref-${i}`} y={entry.target} stroke={entry.fill} strokeDasharray="4 2" opacity={0.5} />
+                    ))}
                   </BarChart>
                 </ResponsiveContainer>
                 <div className="flex gap-4 justify-center text-xs text-gray-500 mt-1">
                   <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-400 rounded-sm" />タンパク質</span>
                   <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-yellow-400 rounded-sm" />脂質</span>
                   <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-green-400 rounded-sm" />炭水化物</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-gray-200 rounded-sm" />目標</span>
                 </div>
               </div>
             )}
