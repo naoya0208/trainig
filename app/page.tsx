@@ -313,6 +313,73 @@ export default function Home() {
           })}
           <p className="text-xs text-gray-300 mt-1">バーの縦線 = 推奨目標 / バー右端 = 上限</p>
 
+          {/* 美容バランス */}
+          {(() => {
+            const isBeauty = profile.goalPurpose === 'beauty';
+            const TOP3 = [
+              { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', target: isBeauty ? 200 : 100, dot: 'bg-orange-400', bar: 'bg-orange-400' },
+              { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  target: 2.0,                   dot: 'bg-blue-400',   bar: 'bg-blue-400'   },
+              { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', target: 10,                    dot: 'bg-teal-400',   bar: 'bg-teal-400'   },
+            ];
+            const SUB4 = [
+              { key: 'niacin'   as const, label: 'ナイアシン', unit: 'mg', target: 13  },
+              { key: 'vitaminA' as const, label: 'ビタミンA',  unit: 'μg', target: 700 },
+              { key: 'vitaminE' as const, label: 'ビタミンE',  unit: 'mg', target: 6   },
+              { key: 'biotin'   as const, label: 'ビオチン',   unit: 'μg', target: 50  },
+            ];
+            return (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-xs font-semibold text-gray-400">美容バランス</p>
+                  {isBeauty && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
+                </div>
+                {/* Top3 バー */}
+                <div className="space-y-2 mb-3">
+                  {TOP3.map(item => {
+                    const v = (todayMicros[item.key] as number) ?? 0;
+                    const pct = Math.min(100, Math.round(v / item.target * 100));
+                    const ok = v >= item.target * 0.8;
+                    return (
+                      <div key={item.key}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
+                          <span className="text-sm text-gray-600 flex-1">{item.label}</span>
+                          <span className={`text-sm font-semibold ${ok ? 'text-gray-700' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>{v}{item.unit}</span>
+                          <span className="text-xs text-gray-400">目標{item.target}{item.unit}</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden ml-5">
+                          <div className={`h-full rounded-full transition-all ${ok ? item.bar : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Sub4 囲みグリッド */}
+                <div className="bg-pink-50/60 border border-pink-100 rounded-xl p-3">
+                  <div className="grid grid-cols-4 gap-2">
+                    {SUB4.map(item => {
+                      const v = (todayMicros[item.key] as number) ?? 0;
+                      const pct = Math.min(100, Math.round(v / item.target * 100));
+                      const ok = v >= item.target * 0.8;
+                      return (
+                        <div key={item.key} className="bg-white rounded-xl px-2 py-2 text-center shadow-sm">
+                          <p className="text-xs text-gray-400 truncate mb-0.5">{item.label}</p>
+                          <p className={`text-sm font-bold ${ok ? 'text-pink-500' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>
+                            {v}<span className="text-xs font-normal">{item.unit}</span>
+                          </p>
+                          <div className="h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
+                            <div className={`h-full rounded-full ${ok ? 'bg-pink-400' : v > 0 ? 'bg-orange-300' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-xs text-gray-300 mt-0.5">{item.target}{item.unit}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* 微量栄養素（常時9項目表示） */}
           <div className="mt-3 pt-3 border-t border-gray-100">
             <p className="text-xs font-semibold text-gray-400 mb-2">微量栄養素</p>

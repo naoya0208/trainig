@@ -18,10 +18,14 @@ export const MICRO_DEFS: {
   { key: 'omega3',     label: 'EPA+DHA',     unit: 'g',  target: 2.0 },
   { key: 'sodium',     label: 'ナトリウム',  unit: 'mg', target: 2000, isLimit: true },
   // 美容向け（goalPurpose === 'beauty' のときのみ表示）
-  { key: 'vitaminE',   label: 'ビタミンE',   unit: 'mg', target: 6.0,  purpose: 'beauty' },
-  { key: 'vitaminA',   label: 'ビタミンA',   unit: 'μg', target: 700,  purpose: 'beauty' },
-  { key: 'biotin',     label: 'ビオチン',    unit: 'μg', target: 50,   purpose: 'beauty' },
-  { key: 'vitaminB2',  label: 'ビタミンB2',  unit: 'mg', target: 1.2,  purpose: 'beauty' },
+  { key: 'vitaminE',        label: 'ビタミンE',    unit: 'mg', target: 6.0,  purpose: 'beauty' },
+  { key: 'vitaminA',        label: 'ビタミンA',    unit: 'μg', target: 700,  purpose: 'beauty' },
+  { key: 'biotin',          label: 'ビオチン',     unit: 'μg', target: 50,   purpose: 'beauty' },
+  { key: 'vitaminB2',       label: 'ビタミンB2',   unit: 'mg', target: 1.2,  purpose: 'beauty' },
+  { key: 'niacin',          label: 'ナイアシン',   unit: 'mg', target: 13,   purpose: 'beauty' },
+  { key: 'pantothenicAcid', label: 'パントテン酸', unit: 'mg', target: 5,    purpose: 'beauty' },
+  { key: 'magnesium',       label: 'マグネシウム', unit: 'mg', target: 270,  purpose: 'beauty' },
+  { key: 'selenium',        label: 'セレン',       unit: 'μg', target: 25,   purpose: 'beauty' },
 ];
 
 /** 表示するMICRO_DEFSをgoalPurpose・genderでフィルタリング＆目標値調整 */

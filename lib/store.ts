@@ -14,10 +14,14 @@ export interface MicroNutrients {
   omega3?: number;     // EPA+DHA g
   sodium?: number;     // ナトリウム mg
   // 美容向け
-  vitaminE?: number;   // ビタミンE mg
-  vitaminA?: number;   // ビタミンA μg
-  biotin?: number;     // ビオチン μg
-  vitaminB2?: number;  // ビタミンB2 mg
+  vitaminE?: number;        // ビタミンE mg
+  vitaminA?: number;        // ビタミンA μg
+  biotin?: number;          // ビオチン μg
+  vitaminB2?: number;       // ビタミンB2 mg
+  niacin?: number;          // ナイアシン(B3) mg
+  pantothenicAcid?: number; // パントテン酸(B5) mg
+  magnesium?: number;       // マグネシウム mg
+  selenium?: number;        // セレン μg
 }
 
 export interface FoodEntry {

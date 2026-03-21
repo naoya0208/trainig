@@ -40,7 +40,11 @@ export async function POST(req: NextRequest) {
           "vitaminE": ビタミンE（mg）,
           "vitaminA": ビタミンA（μg）,
           "biotin": ビオチン（μg）,
-          "vitaminB2": ビタミンB2（mg）
+          "vitaminB2": ビタミンB2（mg）,
+          "niacin": ナイアシン（mg）,
+          "pantothenicAcid": パントテン酸（mg）,
+          "magnesium": マグネシウム（mg）,
+          "selenium": セレン（μg）
         }
       }
     ]
@@ -89,7 +93,11 @@ export async function POST(req: NextRequest) {
           "vitaminE": ビタミンE（mg）,
           "vitaminA": ビタミンA（μg）,
           "biotin": ビオチン（μg）,
-          "vitaminB2": ビタミンB2（mg）
+          "vitaminB2": ビタミンB2（mg）,
+          "niacin": ナイアシン（mg）,
+          "pantothenicAcid": パントテン酸（mg）,
+          "magnesium": マグネシウム（mg）,
+          "selenium": セレン（μg）
         }
       }
     ]
