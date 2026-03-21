@@ -95,6 +95,7 @@ interface Store {
   addWorkout: (s: WorkoutSession) => void;
   removeWorkout: (id: string) => void;
   saveFoodToHistory: (food: SavedFood) => void;
+  removeSavedFood: (id: string) => void;
   toggleFavorite: (id: string) => void;
   addFavoriteGroup: (g: FavoriteGroup) => void;
   updateFavoriteGroup: (id: string, updates: Partial<FavoriteGroup>) => void;
@@ -167,6 +168,11 @@ export const useStore = create<Store>((set, get) => ({
     } else {
       next = [...existing, food];
     }
+    set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
+  },
+
+  removeSavedFood: (id) => {
+    const next = get().savedFoods.filter(f => f.id !== id);
     set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
   },
 

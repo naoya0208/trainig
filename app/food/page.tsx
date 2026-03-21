@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore, FoodEntry, SavedFood, SavedIngredient, FavoriteGroup, MicroNutrients } from '@/lib/store';
 import { MICRO_DEFS } from '@/lib/micros';
 
@@ -64,6 +64,48 @@ function sumGroupNutrition(group: FavoriteGroup, savedFoods: SavedFood[]) {
   }, { calories: 0, protein: 0, fat: 0, carbs: 0, micros: {} as MicroNutrients });
 }
 
+function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children: React.ReactNode }) {
+  const [offsetX, setOffsetX] = useState(0);
+  const startXRef = useRef(0);
+  const THRESHOLD = 60;
+  const MAX = 80;
+
+  function handleTouchStart(e: React.TouchEvent) {
+    startXRef.current = e.touches[0].clientX;
+  }
+  function handleTouchMove(e: React.TouchEvent) {
+    const dx = e.touches[0].clientX - startXRef.current;
+    if (dx < 0) setOffsetX(Math.max(dx, -MAX));
+  }
+  function handleTouchEnd() {
+    if (offsetX < -THRESHOLD) setOffsetX(-MAX);
+    else setOffsetX(0);
+  }
+  function handleReset() { setOffsetX(0); }
+
+  return (
+    <div className="relative overflow-hidden" onClick={offsetX < 0 ? handleReset : undefined}>
+      {/* 削除ボタン（後ろ側） */}
+      <div className="absolute right-0 top-0 h-full w-20 flex items-stretch">
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+          className="w-full bg-red-500 text-white text-sm font-bold flex items-center justify-center active:bg-red-600">
+          削除
+        </button>
+      </div>
+      {/* スライドするコンテンツ */}
+      <div
+        style={{ transform: `translateX(${offsetX}px)`, transition: offsetX === 0 ? 'transform 0.25s' : 'none' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="relative bg-white z-10">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function GramsInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [val, setVal] = useState(String(value));
   useEffect(() => setVal(String(value)), [value]);
@@ -105,10 +147,11 @@ function CountInput({ value, onChange, unit }: { value: number; onChange: (v: nu
 
 interface SupplementInfo { servingUnit: string; gramsPerUnit: number; }
 
-function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement, isAdded }: {
+function EditableFoodCard({ food, meal, onFavorite, onSave, onOnce, isSupplement, isAdded }: {
   food: AIFood; meal: string;
-  onAdd: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
-  onSaveFavorite: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
+  onFavorite: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
+  onSave: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) => void;
+  onOnce: (food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) => void;
   isSupplement?: boolean;
   isAdded?: boolean;
 }) {
@@ -254,14 +297,18 @@ function EditableFoodCard({ food, meal, onAdd, onSaveFavorite, isSupplement, isA
           ? { servingUnit: baseIngredients[0].servingUnit || '粒', gramsPerUnit: baseIngredients[0].grams || 1 }
           : undefined;
         return (
-          <div className="flex gap-2">
-            <button onClick={() => onSaveFavorite(food, displayIngredients, suppInfo, category)}
-              className="flex-1 bg-yellow-50 border border-yellow-200 text-yellow-700 py-2 rounded-lg text-sm font-semibold hover:bg-yellow-100 transition">
-              ★ お気に入りに保存
+          <div className="flex gap-1.5">
+            <button onClick={() => onFavorite(food, displayIngredients, suppInfo, category)}
+              className="flex-1 bg-yellow-50 border border-yellow-200 text-yellow-700 py-2 rounded-lg text-xs font-semibold hover:bg-yellow-100 transition">
+              ★ お気に入り
             </button>
-            <button onClick={() => onAdd(food, displayIngredients, suppInfo, category)}
-              className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold transition ${isAdded ? 'bg-green-500' : isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {isAdded ? '✓ 追加済み' : `${MEAL_LABELS[meal]}に追加`}
+            <button onClick={() => onSave(food, displayIngredients, suppInfo, category)}
+              className="flex-1 bg-gray-50 border border-gray-200 text-gray-600 py-2 rounded-lg text-xs font-semibold hover:bg-gray-100 transition">
+              📁 保存
+            </button>
+            <button onClick={() => onOnce(food, displayIngredients, suppInfo)}
+              className={`flex-1 text-white py-2 rounded-lg text-xs font-semibold transition ${isAdded ? 'bg-green-500' : isSupplement ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+              {isAdded ? '✓ 追加済み' : '今回だけ'}
             </button>
           </div>
         );
@@ -392,7 +439,7 @@ function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
 }
 
 export default function FoodPage() {
-  const { foodEntries, savedFoods, favoriteGroups, addFood, removeFood, updateFood, saveFoodToHistory, toggleFavorite, addFavoriteGroup, updateFavoriteGroup, removeFavoriteGroup, hydrate } = useStore();
+  const { foodEntries, savedFoods, favoriteGroups, addFood, removeFood, updateFood, saveFoodToHistory, removeSavedFood, toggleFavorite, addFavoriteGroup, updateFavoriteGroup, removeFavoriteGroup, hydrate } = useStore();
   const [tab, setTab] = useState<'ai' | 'favorites' | 'history'>('ai');
   const [query, setQuery] = useState('');
   const [meal, setMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch');
@@ -460,15 +507,26 @@ export default function FoodPage() {
     return { id: food.name, foodName: food.name, grams: totals.grams, per100g, ingredients: ingredients as SavedIngredient[], note: food.note, isFavorite: true, lastUsed: eatDate, useCount: 1, servingUnit: suppInfo?.servingUnit, gramsPerUnit: suppInfo?.gramsPerUnit, category };
   }
 
-  function handleAddFood(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) {
+  // ★ お気に入り: ログ追加 + お気に入りとして保存
+  function handleFavorite(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) {
     const totals = sumIngredients(ingredients);
     addFood(buildEntry(food.name, totals, food.note));
-    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo, category));
+    saveFoodToHistory({ ...buildSavedFood(food, ingredients, suppInfo, category), isFavorite: true });
     setAddedFoods(prev => new Set([...prev, food.name]));
   }
 
-  function handleSaveFavorite(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) {
-    saveFoodToHistory(buildSavedFood(food, ingredients, suppInfo, category));
+  // 📁 保存: ログ追加 + カテゴリ保存（お気に入りなし）
+  function handleSave(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo, category?: string) {
+    const totals = sumIngredients(ingredients);
+    addFood(buildEntry(food.name, totals, food.note));
+    saveFoodToHistory({ ...buildSavedFood(food, ingredients, suppInfo, category), isFavorite: false });
+    setAddedFoods(prev => new Set([...prev, food.name]));
+  }
+
+  // 今回だけ: ログ追加のみ（保存しない）
+  function handleOnce(food: AIFood, ingredients: Ingredient[], suppInfo?: SupplementInfo) {
+    const totals = sumIngredients(ingredients);
+    addFood(buildEntry(food.name, totals, food.note));
     setAddedFoods(prev => new Set([...prev, food.name]));
   }
 
@@ -586,7 +644,7 @@ export default function FoodPage() {
                 </button>
               </div>
               {results.map((food, i) => (
-                <EditableFoodCard key={i} food={food} meal={meal} onAdd={handleAddFood} onSaveFavorite={handleSaveFavorite} isSupplement={searchMode === 'supplement'} isAdded={addedFoods.has(food.name)} />
+                <EditableFoodCard key={i} food={food} meal={meal} onFavorite={handleFavorite} onSave={handleSave} onOnce={handleOnce} isSupplement={searchMode === 'supplement'} isAdded={addedFoods.has(food.name)} />
               ))}
             </div>
           )}
@@ -603,7 +661,7 @@ export default function FoodPage() {
             </div>
             {favoriteGroups.length === 0 && <p className="text-xs text-gray-300 mb-3">グループを作成すると複数のメニューをまとめて追加できます</p>}
             <div className="space-y-3 mb-3">
-              {favoriteGroups.map(group => {
+              {favoriteGroups.map((group) => {
                 const items = group.itemIds.map(id => savedFoods.find(f => f.id === id)).filter(Boolean) as SavedFood[];
                 const totals = sumGroupNutrition(group, savedFoods);
                 const hasMicros = MICRO_DEFS.some(d => (totals.micros[d.key] ?? 0) > 0);
@@ -698,10 +756,14 @@ export default function FoodPage() {
                   </div>
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-3 border-t border-yellow-50">
+                  <div className="pb-3 border-t border-yellow-50">
                     {favorites.length === 0
                       ? <p className="text-center text-gray-300 py-4 text-sm">★をつけた食品がありません</p>
-                      : favorites.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+                      : favorites.map(f => (
+                        <SwipeToDelete key={f.id} onDelete={() => removeSavedFood(f.id)}>
+                          <div className="px-4"><SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} /></div>
+                        </SwipeToDelete>
+                      ))}
                   </div>
                 )}
               </div>
@@ -727,10 +789,12 @@ export default function FoodPage() {
                   </div>
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-3 border-t border-gray-50">
-                    <div className="mt-2">
-                      {items.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
-                    </div>
+                  <div className="pb-3 border-t border-gray-50 mt-0">
+                    {items.map(f => (
+                      <SwipeToDelete key={f.id} onDelete={() => removeSavedFood(f.id)}>
+                        <div className="px-4"><SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} /></div>
+                      </SwipeToDelete>
+                    ))}
                   </div>
                 )}
               </div>
@@ -744,7 +808,11 @@ export default function FoodPage() {
         <div className="bg-white rounded-2xl p-4 mb-5 shadow-sm">
           {history.length === 0
             ? <p className="text-center text-gray-300 py-12">履歴がありません</p>
-            : history.map(f => <SavedFoodCard key={f.id} saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />)}
+            : history.map(f => (
+              <SwipeToDelete key={f.id} onDelete={() => removeSavedFood(f.id)}>
+                <SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} />
+              </SwipeToDelete>
+            ))}
         </div>
       )}
 
