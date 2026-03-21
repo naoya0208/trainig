@@ -380,11 +380,16 @@ export default function Home() {
             );
           })()}
 
-          {/* 微量栄養素（常時9項目表示） */}
+          {/* 微量栄養素（美容バランスに表示済みのものを除外） */}
+          {(() => {
+            const BEAUTY_BALANCE_KEYS = new Set(['vitaminC', 'omega3', 'zinc', 'niacin', 'vitaminA', 'vitaminE', 'biotin']);
+            const filteredMicroDefs = MICRO_DEFS.filter(d => !BEAUTY_BALANCE_KEYS.has(d.key));
+            if (filteredMicroDefs.length === 0) return null;
+            return (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <p className="text-xs font-semibold text-gray-400 mb-2">微量栄養素</p>
             <div className="grid grid-cols-3 gap-1.5">
-              {MICRO_DEFS.map(d => {
+              {filteredMicroDefs.map(d => {
                 const v = (todayMicros[d.key] as number) ?? 0;
                 const pct = d.isLimit
                   ? Math.min(100, Math.round(v / d.target * 100))
@@ -406,6 +411,8 @@ export default function Home() {
               })}
             </div>
           </div>
+            );
+          })()}
         </div>
 
         {/* AI栄養分析結果 */}
