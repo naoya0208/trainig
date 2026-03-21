@@ -87,6 +87,7 @@ interface Store {
   foodEntries: FoodEntry[];
   savedFoods: SavedFood[];
   favoriteGroups: FavoriteGroup[];
+  customCategories: string[];
   weightEntries: WeightEntry[];
   workoutSessions: WorkoutSession[];
   syncCode: string;
@@ -100,6 +101,9 @@ interface Store {
   removeWorkout: (id: string) => void;
   saveFoodToHistory: (food: SavedFood) => void;
   removeSavedFood: (id: string) => void;
+  updateSavedFoodCategory: (id: string, category: string) => void;
+  addCustomCategory: (name: string) => void;
+  removeCustomCategory: (name: string) => void;
   toggleFavorite: (id: string) => void;
   addFavoriteGroup: (g: FavoriteGroup) => void;
   updateFavoriteGroup: (id: string, updates: Partial<FavoriteGroup>) => void;
@@ -113,7 +117,7 @@ interface Store {
 const KEYS = {
   profile: 'ct_profile', food: 'ct_food', weight: 'ct_weight',
   workout: 'ct_workout', syncCode: 'ct_sync_code', savedFoods: 'ct_saved_foods',
-  favoriteGroups: 'ct_fav_groups',
+  favoriteGroups: 'ct_fav_groups', customCategories: 'ct_custom_cats',
 };
 
 function save<T>(key: string, val: T) {
@@ -129,6 +133,7 @@ export const useStore = create<Store>((set, get) => ({
   foodEntries: [],
   savedFoods: [],
   favoriteGroups: [],
+  customCategories: [],
   weightEntries: [],
   workoutSessions: [],
   syncCode: '',
@@ -178,6 +183,25 @@ export const useStore = create<Store>((set, get) => ({
   removeSavedFood: (id) => {
     const next = get().savedFoods.filter(f => f.id !== id);
     set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
+  },
+
+  updateSavedFoodCategory: (id, category) => {
+    const next = get().savedFoods.map(f => f.id === id ? { ...f, category } : f);
+    set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
+  },
+
+  addCustomCategory: (name) => {
+    const next = [...get().customCategories.filter(c => c !== name), name];
+    set({ customCategories: next }); save(KEYS.customCategories, next);
+  },
+
+  removeCustomCategory: (name) => {
+    // カテゴリ削除時、そのカテゴリの食品を「その他」に移動
+    const foods = get().savedFoods.map(f => f.category === name ? { ...f, category: 'その他' } : f);
+    const cats = get().customCategories.filter(c => c !== name);
+    set({ savedFoods: foods, customCategories: cats });
+    save(KEYS.savedFoods, foods); save(KEYS.customCategories, cats);
+    get().syncToCloud();
   },
 
   toggleFavorite: (id) => {
@@ -235,6 +259,7 @@ export const useStore = create<Store>((set, get) => ({
       foodEntries: load(KEYS.food, []),
       savedFoods: load(KEYS.savedFoods, []),
       favoriteGroups: load(KEYS.favoriteGroups, []),
+      customCategories: load(KEYS.customCategories, []),
       weightEntries: load(KEYS.weight, []),
       workoutSessions: load(KEYS.workout, []),
       syncCode,
