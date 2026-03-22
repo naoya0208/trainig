@@ -448,33 +448,27 @@ export default function Home() {
             { label: 'C 炭水化物', val: carbs, target: nutritionTargets.carbs, max: nutritionTargets.carbsMax, dot: 'bg-green-500', bar: 'bg-green-400' },
           ].map(item => {
             const overMax = item.val > item.max;
-            const overTarget = item.val > item.target;
             const pct = Math.min(100, Math.round((item.val / item.max) * 100));
             const targetPct = Math.min(100, Math.round((item.target / item.max) * 100));
+            const valPct = Math.round((item.val / item.target) * 100);
+            const valColor = overMax ? 'text-red-500' : valPct >= 80 ? 'text-gray-700' : valPct >= 40 ? 'text-amber-500' : item.val > 0 ? 'text-red-400' : 'text-gray-300';
+            const barColor = overMax ? 'bg-red-400' : item.bar;
             return (
               <div key={item.label}>
                 <div className="flex items-center gap-2 mb-1">
                   <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
                   <span className="text-sm text-gray-600 flex-1">{item.label}</span>
-                  <span className={`text-sm font-semibold ${overMax ? 'text-red-500' : overTarget ? 'text-orange-400' : ''}`}>
-                    {item.val.toFixed(1)}g
-                  </span>
+                  <span className={`text-sm font-semibold ${valColor}`}>{item.val.toFixed(1)}g</span>
                   <span className="text-xs text-gray-400">目標{item.target}g</span>
-                  <span className="text-xs text-red-300">上限{item.max}g</span>
+                  <span className="text-xs text-gray-300">上限{item.max}g</span>
                 </div>
-                {/* バー: 上限を100%として表示、目標位置にマーカー */}
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden ml-5 relative">
-                  <div className={`h-full rounded-full transition-all ${overMax ? 'bg-red-400' : overTarget ? 'bg-orange-400' : item.bar}`}
-                    style={{ width: `${pct}%` }} />
-                  {/* 目標位置マーカー */}
-                  <div className="absolute top-0 h-full w-0.5 bg-gray-400 opacity-60"
-                    style={{ left: `${targetPct}%` }} />
+                  <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  <div className="absolute top-0 h-full w-0.5 bg-gray-400 opacity-40" style={{ left: `${targetPct}%` }} />
                 </div>
-                {overMax && <p className="text-xs text-red-500 ml-5 mt-0.5">⚠️ 上限超過</p>}
               </div>
             );
           })}
-          <p className="text-xs text-gray-300 mt-1">バーの縦線 = 推奨目標 / バー右端 = 上限</p>
 
           {/* ビタミン・ミネラル（PFCに続けて表示） */}
           {(() => {
@@ -499,17 +493,16 @@ export default function Home() {
                     const target = getTarget(item.key);
                     const v = (todayMicros[item.key] as number) ?? 0;
                     const pct = Math.min(100, Math.round(v / target * 100));
-                    const ok = pct >= 80;
+                    const textColor = pct >= 80 ? 'text-gray-500' : pct >= 40 ? 'text-amber-500' : v > 0 ? 'text-red-400' : 'text-gray-300';
+                    const barColor = pct >= 80 ? item.bar : pct >= 40 ? 'bg-amber-400' : v > 0 ? 'bg-red-400' : 'bg-gray-200';
                     return (
                       <div key={item.key}>
                         <div className="flex justify-between text-xs mb-1">
                           <span className="font-semibold text-gray-600">{item.label}</span>
-                          <span className={ok ? 'text-gray-500' : 'text-red-500 font-semibold'}>
-                            {v}{item.unit} / 目標 {target}{item.unit}{!ok && ' ⚠️'}
-                          </span>
+                          <span className={textColor}>{v}{item.unit} / 目標 {target}{item.unit}</span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${ok ? item.bar : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     );

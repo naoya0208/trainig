@@ -183,17 +183,16 @@ export default function WeightPage() {
               { label: '炭水化物',   avg: avg.carbs,   target: nutritionTargets.carbs,   unit: 'g', bar: 'bg-green-400' },
             ].map(item => {
               const pct = Math.min(100, Math.round(item.avg / item.target * 100));
-              const ok = pct >= 80;
+              const textColor = pct >= 80 ? 'text-gray-500' : pct >= 40 ? 'text-amber-500' : item.avg > 0 ? 'text-red-400' : 'text-gray-300';
+              const barColor = pct >= 80 ? item.bar : pct >= 40 ? 'bg-amber-400' : item.avg > 0 ? 'bg-red-400' : 'bg-gray-200';
               return (
                 <div key={item.label}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-semibold text-gray-600">{item.label}</span>
-                    <span className={ok ? 'text-gray-500' : 'text-red-500 font-semibold'}>
-                      平均 {item.avg}{item.unit} / 目標 {item.target}{item.unit}{!ok && ' ⚠️'}
-                    </span>
+                    <span className={textColor}>平均 {item.avg}{item.unit} / 目標 {item.target}{item.unit}</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${ok ? item.bar : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                    <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -220,17 +219,16 @@ export default function WeightPage() {
                     const target = def?.target ?? 0;
                     const v = (avg.micros[item.key] as number) ?? 0;
                     const pct = Math.min(100, Math.round(v / target * 100));
-                    const ok = pct >= 80;
+                    const textColor = pct >= 80 ? 'text-gray-500' : pct >= 40 ? 'text-amber-500' : v > 0 ? 'text-red-400' : 'text-gray-300';
+                    const barColor = pct >= 80 ? item.bar : pct >= 40 ? 'bg-amber-400' : v > 0 ? 'bg-red-400' : 'bg-gray-200';
                     return (
                       <div key={item.key}>
                         <div className="flex justify-between text-xs mb-1">
                           <span className="font-semibold text-gray-600">{item.label}</span>
-                          <span className={ok ? 'text-gray-500' : 'text-red-500 font-semibold'}>
-                            平均 {v}{item.unit} / 目標 {target}{item.unit}{!ok && ' ⚠️'}
-                          </span>
+                          <span className={textColor}>平均 {v}{item.unit} / 目標 {target}{item.unit}</span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${ok ? item.bar : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                          <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     );
@@ -251,12 +249,10 @@ export default function WeightPage() {
                     const cardBg = { ok: 'bg-emerald-50 border-emerald-200', low: 'bg-amber-50 border-amber-200', critical: 'bg-red-50 border-red-200', none: 'bg-white border-gray-100' }[status];
                     const valColor = { ok: 'text-emerald-600', low: 'text-amber-500', critical: 'text-red-500', none: 'text-gray-300' }[status];
                     const barColor = { ok: 'bg-emerald-400', low: 'bg-amber-400', critical: 'bg-red-400', none: 'bg-gray-200' }[status];
-                    const statusIcon = { ok: '✅', low: '⚠️', critical: '❌', none: '○' }[status];
                     return (
                       <div key={d.key} className={`rounded-xl border px-3 py-2.5 ${cardBg}`}>
                         <div className="flex items-center justify-between mb-1">
                           <p className="text-xs font-semibold text-gray-600">{d.label}</p>
-                          <span className="text-xs">{statusIcon}</span>
                         </div>
                         <p className={`text-lg font-bold ${valColor}`}>
                           {v}<span className="text-xs font-normal ml-0.5 text-gray-400">{d.unit}</span>
@@ -297,12 +293,10 @@ export default function WeightPage() {
                     const barColor = {
                       ok: 'bg-emerald-400', low: 'bg-amber-400', critical: 'bg-red-400', none: 'bg-gray-200', over: 'bg-red-500',
                     }[status];
-                    const statusIcon = { ok: '✅', low: '⚠️', critical: '❌', none: '○', over: '🔴' }[status];
                     return (
                       <div key={d.key} className={`rounded-xl border px-2 py-2 ${cardBg}`}>
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p className="text-xs font-semibold text-gray-600 truncate flex-1 mr-1">{d.label}</p>
-                          <span className="text-xs flex-shrink-0">{statusIcon}</span>
+                        <div className="mb-0.5">
+                          <p className="text-xs font-semibold text-gray-600 truncate">{d.label}</p>
                         </div>
                         <p className={`text-sm font-bold ${valColor}`}>{v}<span className="text-xs font-normal ml-0.5 text-gray-400">{d.unit}</span></p>
                         <div className="h-1 bg-white/60 rounded-full mt-1.5 overflow-hidden">
