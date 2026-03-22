@@ -481,9 +481,9 @@ export default function Home() {
             const isBeauty = profile.goalPurpose === 'beauty';
             const getTarget = (key: string) => MICRO_DEFS.find(d => d.key === key)?.target ?? 0;
             const TOP3 = [
-              { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', dot: 'bg-orange-400', bar: 'bg-orange-400' },
-              { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  dot: 'bg-blue-400',   bar: 'bg-blue-400'   },
-              { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', dot: 'bg-teal-400',   bar: 'bg-teal-400'   },
+              { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', bar: 'bg-orange-400' },
+              { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  bar: 'bg-blue-400'   },
+              { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', bar: 'bg-teal-400'   },
             ];
             // 美容モード高優先度4種（常時表示）
             const SUB4 = isBeauty
@@ -495,23 +495,23 @@ export default function Home() {
                   <p className="text-xs font-semibold text-gray-400">美容バランス</p>
                   {isBeauty && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
                 </div>
-                {/* Top3 バー */}
-                <div className="space-y-2 mb-3">
+                {/* Top3 バー（PFCと同スタイル） */}
+                <div className="space-y-3 mb-3">
                   {TOP3.map(item => {
                     const target = getTarget(item.key);
                     const v = (todayMicros[item.key] as number) ?? 0;
                     const pct = Math.min(100, Math.round(v / target * 100));
-                    const ok = v >= target * 0.8;
+                    const ok = pct >= 80;
                     return (
                       <div key={item.key}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
-                          <span className="text-sm text-gray-600 flex-1">{item.label}</span>
-                          <span className={`text-sm font-semibold ${ok ? 'text-gray-700' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>{v}{item.unit}</span>
-                          <span className="text-xs text-gray-400">目標{target}{item.unit}</span>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-semibold text-gray-600">{item.label}</span>
+                          <span className={ok ? 'text-gray-500' : 'text-red-500 font-semibold'}>
+                            {v}{item.unit} / 目標 {target}{item.unit}{!ok && ' ⚠️'}
+                          </span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden ml-5">
-                          <div className={`h-full rounded-full transition-all ${ok ? item.bar : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${ok ? item.bar : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     );
