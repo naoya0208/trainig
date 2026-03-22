@@ -36,6 +36,7 @@ function ProfileContent() {
   const [lastPeriodDate, setLastPeriodDate] = useState('');
   const [isIrregularCycle, setIsIrregularCycle] = useState(false);
   const [cycleLength, setCycleLength] = useState('28');
+  const [manualCycleDay, setManualCycleDay] = useState('');
   const [medications, setMedications] = useState<string[]>([]);
   // 薬AI検索
   const [medQuery, setMedQuery] = useState('');
@@ -113,7 +114,7 @@ function ProfileContent() {
       goalPurpose,
       lastPeriodDate: gender === 'female' && lastPeriodDate ? lastPeriodDate : undefined,
       isIrregularCycle: gender === 'female' ? isIrregularCycle : undefined,
-      cycleLength: gender === 'female' && !isIrregularCycle ? parseInt(cycleLength) || 28 : undefined,
+      cycleLength: gender === 'female' ? parseInt(cycleLength) || 28 : undefined,
     };
   })();
 
@@ -135,6 +136,24 @@ function ProfileContent() {
       });
       setAiAdvice(await res.json());
     } finally { setLoadingAdvice(false); }
+  }
+
+  /** 今日を生理開始日として設定 */
+  function handlePeriodStartToday() {
+    const today = new Date().toISOString().split('T')[0];
+    setLastPeriodDate(today);
+    setManualCycleDay('');
+  }
+
+  /** 「現在の周期日数」から逆算してlastPeriodDateを更新 */
+  function handleApplyCycleDay() {
+    const day = parseInt(manualCycleDay);
+    const cl = parseInt(cycleLength) || 28;
+    if (!day || day < 1 || day > cl) return;
+    const d = new Date();
+    d.setDate(d.getDate() - (day - 1));
+    setLastPeriodDate(d.toISOString().split('T')[0]);
+    setManualCycleDay('');
   }
 
   async function handleMedSearch() {
@@ -427,23 +446,61 @@ function ProfileContent() {
               <p>• 生理不順はストレス・栄養不足・体重変化が原因のことが多いです</p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 block mb-1">直近の生理開始日</label>
-              <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+          {/* 生理開始日 + 今日ボタン */}
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-gray-500 block mb-1">直近の生理開始日</label>
+            <div className="flex gap-2">
+              <input type="date" className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
                 max={new Date().toISOString().split('T')[0]}
-                value={lastPeriodDate} onChange={e => setLastPeriodDate(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 block mb-1">平均周期日数{isIrregularCycle ? '（目安）' : ''}</label>
-              <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
-                <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
-                  type="number" placeholder="28" min="21" max="40"
-                  value={cycleLength} onChange={e => setCycleLength(e.target.value)} />
-                <span className="text-sm text-gray-400">日</span>
-              </div>
+                value={lastPeriodDate} onChange={e => { setLastPeriodDate(e.target.value); setManualCycleDay(''); }} />
+              <button onClick={handlePeriodStartToday}
+                className="bg-red-100 hover:bg-red-200 text-red-600 font-semibold text-xs px-3 rounded-xl border border-red-200 transition flex-shrink-0">
+                🔴 今日から
+              </button>
             </div>
           </div>
+
+          {/* 平均周期日数 */}
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-gray-500 block mb-1">平均周期日数{isIrregularCycle ? '（目安）' : ''}</label>
+            <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
+              <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
+                type="number" placeholder="28" min="21" max="40"
+                value={cycleLength} onChange={e => setCycleLength(e.target.value)} />
+              <span className="text-sm text-gray-400">日</span>
+            </div>
+          </div>
+
+          {/* フェーズ手動調整（現在の周期日数から逆算） */}
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-gray-500 block mb-1">
+              今日は周期の第何日目？
+              <span className="font-normal text-gray-400 ml-1">（フェーズが違う場合に手動修正）</span>
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
+                <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
+                  type="number" placeholder={`1〜${parseInt(cycleLength)||28}`}
+                  min="1" max={parseInt(cycleLength)||28}
+                  value={manualCycleDay} onChange={e => setManualCycleDay(e.target.value)} />
+                <span className="text-sm text-gray-400">日目</span>
+              </div>
+              <button onClick={handleApplyCycleDay}
+                disabled={!manualCycleDay || parseInt(manualCycleDay) < 1 || parseInt(manualCycleDay) > (parseInt(cycleLength)||28)}
+                className="bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white font-semibold text-xs px-4 rounded-xl transition flex-shrink-0">
+                更新
+              </button>
+            </div>
+            {manualCycleDay && parseInt(manualCycleDay) >= 1 && parseInt(manualCycleDay) <= (parseInt(cycleLength)||28) && (() => {
+              const day = parseInt(manualCycleDay);
+              const d = new Date(); d.setDate(d.getDate() - (day - 1));
+              const cl = parseInt(cycleLength) || 28;
+              const info = getMenstrualPhase(d.toISOString().split('T')[0], cl);
+              return <p className="text-xs text-pink-500 mt-1">→ 更新後のフェーズ：{info.label}</p>;
+            })()}
+          </div>
+
+          {/* 現在フェーズ表示 */}
           {lastPeriodDate && (() => {
             const cl = parseInt(cycleLength) || 28;
             const info = getMenstrualPhase(lastPeriodDate, cl);
@@ -453,21 +510,20 @@ function ProfileContent() {
               ovulation: 'bg-yellow-50 border-yellow-200 text-yellow-700',
               luteal: 'bg-purple-50 border-purple-200 text-purple-700',
             };
-            const cls = phaseColors[info.phase];
             return (
-              <div className={`rounded-xl border p-3 ${cls}`}>
-                <p className="font-bold text-sm mb-1">現在：{info.label}（第{info.day}日）</p>
+              <div className={`rounded-xl border p-3 ${phaseColors[info.phase]}`}>
+                <p className="font-bold text-sm mb-1">現在：{info.label}（第{info.day}日 / 周期{cl}日）</p>
                 {info.extraCalories > 0 && (
-                <p className="text-xs mb-2">
-                  📈 カロリー目標 +{info.extraCalories}kcal（代謝上昇を反映）
-                  {isIrregularCycle && <span className="opacity-60 ml-1">推定値</span>}
-                </p>
-              )}
-              <ul className="space-y-0.5">
-                {info.tips.map((t, i) => <li key={i} className="text-xs opacity-80">• {t}</li>)}
-              </ul>
-            </div>
-          );
+                  <p className="text-xs mb-2">
+                    📈 カロリー目標 +{info.extraCalories}kcal（代謝上昇を反映）
+                    {isIrregularCycle && <span className="opacity-60 ml-1">推定値</span>}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {info.tips.map((t, i) => <li key={i} className="text-xs opacity-80">• {t}</li>)}
+                </ul>
+              </div>
+            );
           })()}
           {!lastPeriodDate && (
             <p className="text-xs text-gray-400">生理開始日を入力すると、フェーズ別栄養アドバイスと黄体期カロリー+200kcal調整が有効になります。</p>

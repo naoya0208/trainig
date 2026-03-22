@@ -16,6 +16,7 @@ export default function Home() {
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [nutritionAdvice, setNutritionAdvice] = useState<{ deficiencies: any[]; timing: any[]; overall: string } | null>(null);
   const [loadingNutrition, setLoadingNutrition] = useState(false);
+  const [cycleDayInput, setCycleDayInput] = useState('');
 
   useEffect(() => {
     hydrate();
@@ -79,6 +80,23 @@ export default function Home() {
   const fat = todayFood.reduce((s, e) => s + e.fat, 0);
   const carbs = todayFood.reduce((s, e) => s + e.carbs, 0);
   const todayMicros = sumMicros(todayFood);
+
+  // 月経クイック操作（profile nullガードはreturn前に済んでいるが関数として定義するため型アサーション）
+  function handlePeriodStartToday() {
+    if (!profile) return;
+    setProfile({ ...profile, lastPeriodDate: today });
+    setCycleDayInput('');
+  }
+  function handleApplyCycleDay() {
+    if (!profile) return;
+    const day = parseInt(cycleDayInput);
+    const cl = profile.cycleLength ?? 28;
+    if (!day || day < 1 || day > cl) return;
+    const d = new Date();
+    d.setDate(d.getDate() - (day - 1));
+    setProfile({ ...profile, lastPeriodDate: d.toISOString().split('T')[0] });
+    setCycleDayInput('');
+  }
 
   // 食事タイミング判定
   const currentHour = new Date().getHours();
@@ -200,17 +218,44 @@ export default function Home() {
           <div className={`rounded-2xl border p-3 mb-4 flex items-start gap-3 ${phaseConfig.bg}`}>
             <span className="text-xl mt-0.5">{phaseConfig.icon}</span>
             <div className="flex-1">
-              <p className={`text-sm font-bold ${phaseConfig.color}`}>{menstrualInfo.label}（第{menstrualInfo.day}日 / 周期{profile.cycleLength ?? 28}日）</p>
-              {profile.isIrregularCycle && (
-                <p className="text-xs text-gray-400 mt-0.5">🌸 不定期モード（参考表示）</p>
-              )}
-              <p className="text-xs text-gray-500 mt-0.5">{menstrualInfo.tips[0]}</p>
-              {menstrualInfo.extraCalories > 0 && (
-                <p className={`text-xs font-semibold mt-1 ${phaseConfig.color}`}>
-                  📈 目標カロリー +{menstrualInfo.extraCalories}kcal（代謝上昇分）
-                  {profile.isIrregularCycle && <span className="text-gray-400 font-normal ml-1">推定</span>}
-                </p>
-              )}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className={`text-sm font-bold ${phaseConfig.color}`}>{menstrualInfo.label}（第{menstrualInfo.day}日 / 周期{profile.cycleLength ?? 28}日）</p>
+                  {profile.isIrregularCycle && (
+                    <p className="text-xs text-gray-400 mt-0.5">🌸 不定期モード</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-0.5">{menstrualInfo.tips[0]}</p>
+                  {menstrualInfo.extraCalories > 0 && (
+                    <p className={`text-xs font-semibold mt-1 ${phaseConfig.color}`}>
+                      📈 目標カロリー +{menstrualInfo.extraCalories}kcal（代謝上昇分）
+                      {profile.isIrregularCycle && <span className="text-gray-400 font-normal ml-1">推定</span>}
+                    </p>
+                  )}
+                </div>
+                {/* 突然生理が来た */}
+                <button onClick={handlePeriodStartToday}
+                  className="flex-shrink-0 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-red-200 transition leading-tight text-center">
+                  🔴<br/>今日から<br/>生理
+                </button>
+              </div>
+              {/* 周期日数クイック変更（フェーズがずれてる場合） */}
+              <div className="mt-2 flex items-center gap-2">
+                <p className="text-xs text-gray-400 flex-shrink-0">第何日目？</p>
+                <div className="flex-1 flex items-center bg-white/70 rounded-lg border border-gray-200 px-2">
+                  <input
+                    className="flex-1 py-1 text-sm font-bold bg-transparent focus:outline-none w-0 min-w-0"
+                    type="number" placeholder={`1〜${profile.cycleLength ?? 28}`}
+                    min="1" max={profile.cycleLength ?? 28}
+                    value={cycleDayInput} onChange={e => setCycleDayInput(e.target.value)}
+                  />
+                  <span className="text-xs text-gray-400 flex-shrink-0">日目</span>
+                </div>
+                <button onClick={handleApplyCycleDay}
+                  disabled={!cycleDayInput || parseInt(cycleDayInput) < 1 || parseInt(cycleDayInput) > (profile.cycleLength ?? 28)}
+                  className="flex-shrink-0 bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                  更新
+                </button>
+              </div>
             </div>
             <Link href="/profile" className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5">設定 →</Link>
           </div>
