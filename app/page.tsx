@@ -17,6 +17,7 @@ export default function Home() {
   const [nutritionAdvice, setNutritionAdvice] = useState<{ deficiencies: any[]; timing: any[]; overall: string } | null>(null);
   const [loadingNutrition, setLoadingNutrition] = useState(false);
   const [cycleDayInput, setCycleDayInput] = useState('');
+  const [showAllBeautyMicros, setShowAllBeautyMicros] = useState(false);
 
   useEffect(() => {
     hydrate();
@@ -71,7 +72,7 @@ export default function Home() {
   const affectedNutrients = getAffectedNutrients(profile.medications ?? [], customMedications);
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
   const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);
-  const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose, profile.gender);
+  const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose, profile.gender, menstrualInfo ?? undefined);
   const net = consumed - burned;
   const remaining = Math.max(0, targetCalories - net);
   const pct = Math.min(100, Math.round((net / targetCalories) * 100));
@@ -230,6 +231,25 @@ export default function Home() {
                       📈 目標カロリー +{menstrualInfo.extraCalories}kcal（代謝上昇分）
                       {profile.isIrregularCycle && <span className="text-gray-400 font-normal ml-1">推定</span>}
                     </p>
+                  )}
+                  {/* 研究根拠に基づく栄養素調整 */}
+                  {menstrualInfo.nutrientAdjustments.filter(a => a.delta !== 0).length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold text-gray-500 mb-1">🔬 このフェーズの栄養目標調整</p>
+                      <div className="flex flex-wrap gap-1">
+                        {menstrualInfo.nutrientAdjustments.filter(a => a.delta !== 0).map(adj => {
+                          const def = MICRO_DEFS.find(d => d.key === adj.key);
+                          const label = def?.label ?? adj.key;
+                          const unit = def?.unit ?? '';
+                          return (
+                            <span key={adj.key} title={adj.reason}
+                              className={`text-xs px-2 py-0.5 rounded-full border font-medium ${phaseConfig.color} bg-white/70 border-current`}>
+                              {label} {adj.delta > 0 ? `+${adj.delta}` : adj.delta}{unit}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
                 {/* 突然生理が来た */}
@@ -459,17 +479,16 @@ export default function Home() {
           {/* 美容バランス */}
           {(() => {
             const isBeauty = profile.goalPurpose === 'beauty';
+            const getTarget = (key: string) => MICRO_DEFS.find(d => d.key === key)?.target ?? 0;
             const TOP3 = [
-              { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', target: isBeauty ? 200 : 100, dot: 'bg-orange-400', bar: 'bg-orange-400' },
-              { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  target: 2.0,                   dot: 'bg-blue-400',   bar: 'bg-blue-400'   },
-              { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', target: 10,                    dot: 'bg-teal-400',   bar: 'bg-teal-400'   },
+              { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', dot: 'bg-orange-400', bar: 'bg-orange-400' },
+              { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  dot: 'bg-blue-400',   bar: 'bg-blue-400'   },
+              { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', dot: 'bg-teal-400',   bar: 'bg-teal-400'   },
             ];
-            const SUB4 = [
-              { key: 'niacin'   as const, label: 'ナイアシン', unit: 'mg', target: 13  },
-              { key: 'vitaminA' as const, label: 'ビタミンA',  unit: 'μg', target: 700 },
-              { key: 'vitaminE' as const, label: 'ビタミンE',  unit: 'mg', target: 6   },
-              { key: 'biotin'   as const, label: 'ビオチン',   unit: 'μg', target: 50  },
-            ];
+            // 美容モード高優先度4種（常時表示）
+            const SUB4 = isBeauty
+              ? MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'high')
+              : [];
             return (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2 mb-3">
@@ -479,16 +498,17 @@ export default function Home() {
                 {/* Top3 バー */}
                 <div className="space-y-2 mb-3">
                   {TOP3.map(item => {
+                    const target = getTarget(item.key);
                     const v = (todayMicros[item.key] as number) ?? 0;
-                    const pct = Math.min(100, Math.round(v / item.target * 100));
-                    const ok = v >= item.target * 0.8;
+                    const pct = Math.min(100, Math.round(v / target * 100));
+                    const ok = v >= target * 0.8;
                     return (
                       <div key={item.key}>
                         <div className="flex items-center gap-2 mb-1">
                           <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
                           <span className="text-sm text-gray-600 flex-1">{item.label}</span>
                           <span className={`text-sm font-semibold ${ok ? 'text-gray-700' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>{v}{item.unit}</span>
-                          <span className="text-xs text-gray-400">目標{item.target}{item.unit}</span>
+                          <span className="text-xs text-gray-400">目標{target}{item.unit}</span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden ml-5">
                           <div className={`h-full rounded-full transition-all ${ok ? item.bar : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
@@ -497,46 +517,80 @@ export default function Home() {
                     );
                   })}
                 </div>
-                {/* Sub4 囲みグリッド */}
-                <div className="bg-pink-50/60 border border-pink-100 rounded-xl p-3">
-                  <div className="grid grid-cols-4 gap-2">
-                    {SUB4.map(item => {
-                      const v = (todayMicros[item.key] as number) ?? 0;
-                      const pct = Math.min(100, Math.round(v / item.target * 100));
-                      const ok = v >= item.target * 0.8;
-                      return (
-                        <div key={item.key} className="bg-white rounded-xl px-2 py-2 text-center shadow-sm">
-                          <p className="text-xs text-gray-400 truncate mb-0.5">{item.label}</p>
-                          <p className={`text-sm font-bold ${ok ? 'text-pink-500' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>
-                            {v}<span className="text-xs font-normal">{item.unit}</span>
-                          </p>
-                          <div className="h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
-                            <div className={`h-full rounded-full ${ok ? 'bg-pink-400' : v > 0 ? 'bg-orange-300' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                {/* 美容モード高優先度4種（囲みグリッド） */}
+                {SUB4.length > 0 && (
+                  <div className="bg-pink-50/60 border border-pink-100 rounded-xl p-3">
+                    <div className="grid grid-cols-4 gap-2">
+                      {SUB4.map(d => {
+                        const v = (todayMicros[d.key] as number) ?? 0;
+                        const pct = Math.min(100, Math.round(v / d.target * 100));
+                        const ok = v >= d.target * 0.8;
+                        return (
+                          <div key={d.key} className="bg-white rounded-xl px-2 py-2 text-center shadow-sm">
+                            <p className="text-xs text-gray-400 truncate mb-0.5">{d.label}</p>
+                            <p className={`text-sm font-bold ${ok ? 'text-pink-500' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>
+                              {v}<span className="text-xs font-normal">{d.unit}</span>
+                            </p>
+                            <div className="h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
+                              <div className={`h-full rounded-full ${ok ? 'bg-pink-400' : v > 0 ? 'bg-orange-300' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <p className="text-xs text-gray-300 mt-0.5">{d.target}{d.unit}</p>
                           </div>
-                          <p className="text-xs text-gray-300 mt-0.5">{item.target}{item.unit}</p>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
+                {/* 美容モード低優先度（折りたたみ） */}
+                {isBeauty && (() => {
+                  const lowDefs = MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'low');
+                  if (lowDefs.length === 0) return null;
+                  return (
+                    <div className="mt-2">
+                      <button onClick={() => setShowAllBeautyMicros(v => !v)}
+                        className="text-xs text-pink-400 hover:text-pink-600 font-semibold flex items-center gap-1">
+                        {showAllBeautyMicros ? '▲ 詳細を閉じる' : `▼ 詳細栄養素をもっと見る（${lowDefs.length}種）`}
+                      </button>
+                      {showAllBeautyMicros && (
+                        <div className="grid grid-cols-3 gap-1.5 mt-2">
+                          {lowDefs.map(d => {
+                            const v = (todayMicros[d.key] as number) ?? 0;
+                            const pct = Math.min(100, Math.round(v / d.target * 100));
+                            const ok = v >= d.target * 0.8;
+                            const color = ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400';
+                            return (
+                              <div key={d.key} className={`rounded-xl border px-2 py-1.5 ${color}`}>
+                                <p className="text-xs font-semibold truncate">{d.label}</p>
+                                <p className="text-sm font-bold">{v}<span className="text-xs font-normal ml-0.5">{d.unit}</span></p>
+                                <div className="h-1 bg-white/60 rounded-full mt-1 overflow-hidden">
+                                  <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                                </div>
+                                <p className="text-xs opacity-60 mt-0.5">目標{d.target}{d.unit}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
 
-          {/* 微量栄養素（美容バランスに表示済みのものを除外） */}
+          {/* 微量栄養素（基本9種 - 美容バランスに表示済みのものを除外） */}
           {(() => {
-            const BEAUTY_BALANCE_KEYS = new Set(['vitaminC', 'omega3', 'zinc', 'niacin', 'vitaminA', 'vitaminE', 'biotin']);
-            const filteredMicroDefs = MICRO_DEFS.filter(d => !BEAUTY_BALANCE_KEYS.has(d.key));
-            if (filteredMicroDefs.length === 0) return null;
+            const TOP3_KEYS = new Set(['vitaminC', 'omega3', 'zinc']);
+            // 美容モード以外は基本栄養素（purpose なし）のみ表示
+            const baseDefs = MICRO_DEFS.filter(d => !d.purpose && !TOP3_KEYS.has(d.key));
+            if (baseDefs.length === 0) return null;
             return (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <p className="text-xs font-semibold text-gray-400 mb-2">微量栄養素</p>
             <div className="grid grid-cols-3 gap-1.5">
-              {filteredMicroDefs.map(d => {
+              {baseDefs.map(d => {
                 const v = (todayMicros[d.key] as number) ?? 0;
-                const pct = d.isLimit
-                  ? Math.min(100, Math.round(v / d.target * 100))
-                  : Math.min(100, Math.round(v / d.target * 100));
+                const pct = Math.min(100, Math.round(v / d.target * 100));
                 const ok = d.isLimit ? v <= d.target : v >= d.target * 0.8;
                 const color = d.isLimit
                   ? (v > d.target ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600')

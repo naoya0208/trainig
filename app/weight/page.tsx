@@ -31,12 +31,15 @@ const NUTRIENT_FOODS: Record<string, string[]> = {
   'マグネシウム':  ['アーモンド', '豆腐', '納豆', 'ほうれん草', 'バナナ', '玄米'],
   'セレン':        ['まぐろ', 'いわし', '牡蠣', '卵', 'くるみ'],
   'ビタミンK2':    ['納豆', 'チーズ', '鶏もも肉', 'バター', '卵黄'],
+  'ビタミンB6':    ['まぐろ', '鶏むね肉', 'バナナ', 'さつまいも', 'ピスタチオ'],
+  '葉酸':          ['枝豆', 'ほうれん草', 'ブロッコリー', 'アスパラ', 'レバー'],
 };
 
 export default function WeightPage() {
   const { profile, weightEntries, foodEntries, addWeight, setProfile, hydrate } = useStore();
   const [input, setInput] = useState('');
   const [today, setToday] = useState(getToday);
+  const [showAllBeautyMicros, setShowAllBeautyMicros] = useState(false);
 
   useEffect(() => {
     hydrate();
@@ -95,11 +98,13 @@ export default function WeightPage() {
     })(),
   };
 
-  // 不足栄養素（PFCとmicros両方チェック）
+  const isBeautyMode = profile?.goalPurpose === 'beauty';
+
+  // 不足栄養素（PFCとmicros両方チェック）- 美容モード以外は基本栄養素のみ
   const deficient: { label: string; foods: string[] }[] = [];
   if (avg && nutritionTargets) {
     if (avg.protein < nutritionTargets.protein * 0.8) deficient.push({ label: 'タンパク質', foods: NUTRIENT_FOODS['タンパク質'] });
-    MICRO_DEFS.filter(d => !d.isLimit).forEach(d => {
+    MICRO_DEFS.filter(d => !d.isLimit && (!d.purpose || (isBeautyMode && d.purpose === 'beauty'))).forEach(d => {
       const v = avg.micros[d.key] ?? 0;
       if (v < d.target * 0.8) {
         const foods = NUTRIENT_FOODS[d.label] ?? [];
@@ -194,29 +199,133 @@ export default function WeightPage() {
             })}
           </div>
 
-          {/* 微量栄養素9項目（常時表示） */}
+          {/* 栄養素バランス（7日平均） */}
           <div className="border-t border-gray-100 pt-3">
-            <p className="text-xs font-semibold text-gray-400 mb-2">微量栄養素（7日平均）</p>
-            <div className="grid grid-cols-3 gap-1.5">
-              {MICRO_DEFS.map(d => {
-                const v = (avg.micros[d.key] as number) ?? 0;
-                const pct = Math.min(100, Math.round(v / d.target * 100));
-                const ok = d.isLimit ? v <= d.target : v >= d.target * 0.8;
-                const color = d.isLimit
-                  ? (v > d.target ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600')
-                  : (ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400');
-                return (
-                  <div key={d.key} className={`rounded-xl border px-2 py-1.5 ${color}`}>
-                    <p className="text-xs font-semibold truncate">{d.label}</p>
-                    <p className="text-sm font-bold">{v}<span className="text-xs font-normal ml-0.5">{d.unit}</span></p>
-                    <div className="h-1 bg-white/60 rounded-full mt-1 overflow-hidden">
-                      <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className="text-xs opacity-60 mt-0.5">{d.isLimit ? '上限' : '目標'}{d.target}{d.unit}</p>
-                  </div>
-                );
-              })}
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs font-semibold text-gray-400">栄養素バランス（7日平均）</p>
+              {isBeautyMode && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
             </div>
+
+            {/* ① TOP3 バー表示（最重要・常時） */}
+            {(() => {
+              const TOP3 = [
+                { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', dot: 'bg-orange-400', bar: 'bg-orange-400' },
+                { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  dot: 'bg-blue-400',   bar: 'bg-blue-400'   },
+                { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', dot: 'bg-teal-400',   bar: 'bg-teal-400'   },
+              ];
+              return (
+                <div className="space-y-2 mb-4">
+                  {TOP3.map(item => {
+                    const def = MICRO_DEFS.find(d => d.key === item.key);
+                    const target = def?.target ?? 0;
+                    const v = (avg.micros[item.key] as number) ?? 0;
+                    const pct = Math.min(100, Math.round(v / target * 100));
+                    const ok = v >= target * 0.8;
+                    return (
+                      <div key={item.key}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
+                          <span className="text-sm text-gray-600 flex-1">{item.label}</span>
+                          <span className={`text-sm font-semibold ${ok ? 'text-gray-700' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>{v}{item.unit}</span>
+                          <span className="text-xs text-gray-400">目標{target}{item.unit}</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden ml-5">
+                          <div className={`h-full rounded-full transition-all ${ok ? item.bar : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* ② 高優先度美容4種（2列大カード・美容モード常時） */}
+            {isBeautyMode && (
+              <div className="bg-pink-50/60 border border-pink-100 rounded-xl p-3 mb-3">
+                <p className="text-xs font-semibold text-pink-400 mb-2">✨ 美容キー栄養素</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'high').map(d => {
+                    const v = (avg.micros[d.key] as number) ?? 0;
+                    const pct = Math.min(100, Math.round(v / d.target * 100));
+                    const ok = v >= d.target * 0.8;
+                    return (
+                      <div key={d.key} className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-semibold text-gray-500">{d.label}</p>
+                          <p className={`text-base font-bold ${ok ? 'text-pink-500' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>
+                            {v}<span className="text-xs font-normal ml-0.5">{d.unit}</span>
+                          </p>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${ok ? 'bg-pink-400' : v > 0 ? 'bg-orange-300' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs text-gray-300 mt-1">目標 {d.target}{d.unit} / {pct}%</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ③ 基本微量栄養素（3列中カード・常時） */}
+            {(() => {
+              const TOP3_KEYS = new Set(['vitaminC', 'omega3', 'zinc']);
+              const baseDefs = MICRO_DEFS.filter(d => !d.purpose && !TOP3_KEYS.has(d.key));
+              return (
+                <div className="grid grid-cols-3 gap-1.5 mb-3">
+                  {baseDefs.map(d => {
+                    const v = (avg.micros[d.key] as number) ?? 0;
+                    const pct = Math.min(100, Math.round(v / d.target * 100));
+                    const ok = d.isLimit ? v <= d.target : v >= d.target * 0.8;
+                    const color = d.isLimit
+                      ? (v > d.target ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600')
+                      : (ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400');
+                    return (
+                      <div key={d.key} className={`rounded-xl border px-2 py-2 ${color}`}>
+                        <p className="text-xs font-semibold truncate">{d.label}</p>
+                        <p className="text-sm font-bold mt-0.5">{v}<span className="text-xs font-normal ml-0.5">{d.unit}</span></p>
+                        <div className="h-1 bg-white/60 rounded-full mt-1.5 overflow-hidden">
+                          <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs opacity-50 mt-0.5">{d.isLimit ? '上限' : '目標'}{d.target}{d.unit}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* ④ 低優先度美容（3列コンパクト・折りたたみ） */}
+            {isBeautyMode && (() => {
+              const lowDefs = MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'low');
+              return (
+                <div>
+                  <button onClick={() => setShowAllBeautyMicros(v => !v)}
+                    className="text-xs text-pink-400 hover:text-pink-600 font-semibold flex items-center gap-1 mb-2">
+                    {showAllBeautyMicros ? '▲ 詳細を閉じる' : `▼ 詳細栄養素（${lowDefs.length}種）`}
+                  </button>
+                  {showAllBeautyMicros && (
+                    <div className="grid grid-cols-4 gap-1">
+                      {lowDefs.map(d => {
+                        const v = (avg.micros[d.key] as number) ?? 0;
+                        const pct = Math.min(100, Math.round(v / d.target * 100));
+                        const ok = v >= d.target * 0.8;
+                        const color = ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400';
+                        return (
+                          <div key={d.key} className={`rounded-lg border px-1.5 py-1.5 ${color}`}>
+                            <p className="text-xs font-semibold truncate leading-tight">{d.label}</p>
+                            <p className="text-xs font-bold mt-0.5">{v}<span className="text-xs font-normal">{d.unit}</span></p>
+                            <div className="h-0.5 bg-white/60 rounded-full mt-1 overflow-hidden">
+                              <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* 不足栄養素と食品提案 */}

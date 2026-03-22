@@ -24,6 +24,8 @@ export interface MicroNutrients {
   magnesium?: number;       // マグネシウム mg
   selenium?: number;        // セレン μg
   vitaminK2?: number;       // ビタミンK2 μg（骨密度・血管健康）
+  vitaminB6?: number;       // ビタミンB6 mg（PMS・神経伝達物質合成）
+  folate?: number;          // 葉酸 μg（DNA合成・卵胞発育）
 }
 
 export interface WaterEntry {

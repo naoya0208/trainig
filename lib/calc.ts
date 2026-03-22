@@ -26,12 +26,19 @@ export interface Profile {
 
 export type MenstrualPhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal';
 
+export interface NutrientAdjustment {
+  key: string;    // MicroNutrients のキー
+  delta: number;  // ベース目標値に加算する量
+  reason: string; // 根拠（論文・機序の要約）
+}
+
 export interface MenstrualPhaseInfo {
   phase: MenstrualPhase;
   label: string;
-  day: number;        // 周期の何日目か
-  extraCalories: number; // 黄体期は+100-300kcal
+  day: number;
+  extraCalories: number;
   tips: string[];
+  nutrientAdjustments: NutrientAdjustment[];
 }
 
 /** 月経周期フェーズを計算（女性のみ）
@@ -52,18 +59,38 @@ export function getMenstrualPhase(lastPeriodDate: string, cycleLength = 28): Men
   if (day <= 5) return {
     phase: 'menstrual', label: '月経期', day, extraCalories: 0,
     tips: ['鉄分・亜鉛を意識して補給', 'ショウガ・温かい食事で血行促進', '無理な運動は避けゆっくり過ごす'],
+    nutrientAdjustments: [
+      { key: 'iron',     delta: 2,   reason: 'Hallberg 1966・WHO — 出血による鉄損失（月経血1mlあたり約0.5mg）' },
+      { key: 'vitaminC', delta: 30,  reason: 'Hallberg 1989 — ビタミンCが鉄の非ヘム鉄吸収を3〜4倍に向上' },
+      { key: 'omega3',   delta: 0.5, reason: 'Harel 1996 RCT — EPA/DHAがプロスタグランジンE2産生を抑制し月経痛を有意に軽減' },
+      { key: 'zinc',     delta: 1,   reason: '月経血中の亜鉛損失（Tamura & Goldenberg 1996）' },
+    ],
   };
   if (day <= follicularEnd) return {
     phase: 'follicular', label: '卵胞期', day, extraCalories: 0,
     tips: ['エネルギー代謝が高まる時期', 'タンパク質・鉄分でコラーゲン合成を促進', '運動効果が出やすいタイミング'],
+    nutrientAdjustments: [
+      { key: 'iron',   delta: 1, reason: '月経後の貯蔵鉄（フェリチン）回復のため継続補充' },
+      { key: 'folate', delta: 0, reason: '卵胞発育・DNA合成に必要（標準量を維持）' },
+    ],
   };
   if (day === ovulationDay) return {
     phase: 'ovulation', label: '排卵期', day, extraCalories: 0,
     tips: ['亜鉛・ビタミンB群で排卵をサポート', '代謝が最も高い時期', '筋トレの効果が出やすい'],
+    nutrientAdjustments: [
+      { key: 'zinc',     delta: 1,  reason: 'Maret & Sandstead 2006 — 亜鉛がLHサージ・卵胞破裂に必要' },
+      { key: 'vitaminC', delta: 20, reason: '排卵時の卵胞液中で酸化ストレスが増加、抗酸化保護に有効' },
+    ],
   };
   return {
     phase: 'luteal', label: '黄体期', day, extraCalories: 200,
     tips: ['基礎代謝が+100〜300kcal上昇', 'マグネシウム・ビタミンB6でPMS緩和', '糖質・脂質への欲求が増すが意識して腸活食品を'],
+    nutrientAdjustments: [
+      { key: 'magnesium', delta: 50,  reason: 'Facchinetti 1991・Walker 1998 RCT — マグネシウム補給でPMS症状を有意に軽減' },
+      { key: 'calcium',   delta: 200, reason: 'Thys-Jacobs 1998 RCT — 1200mg/日カルシウムでPMS症状48%減少' },
+      { key: 'vitaminB6', delta: 0.3, reason: 'Wyatt 1999 メタ解析 — ビタミンB6がセロトニン合成を助けPMSに有効' },
+      { key: 'fiber',     delta: 3,   reason: '黄体期のプロゲステロン上昇による腸運動低下 → 便秘・腹部膨満を緩和' },
+    ],
   };
 }
 

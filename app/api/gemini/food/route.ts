@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
           "pantothenicAcid": パントテン酸（mg）,
           "magnesium": マグネシウム（mg）,
           "selenium": セレン（μg）,
-          "vitaminK2": ビタミンK2（μg）
+          "vitaminK2": ビタミンK2（μg）,
+          "vitaminB6": ビタミンB6（mg）,
+          "folate": 葉酸（μg）
         }
       }
     ]
@@ -98,7 +100,10 @@ export async function POST(req: NextRequest) {
           "niacin": ナイアシン（mg）,
           "pantothenicAcid": パントテン酸（mg）,
           "magnesium": マグネシウム（mg）,
-          "selenium": セレン（μg）
+          "selenium": セレン（μg）,
+          "vitaminK2": ビタミンK2（μg）,
+          "vitaminB6": ビタミンB6（mg）,
+          "folate": 葉酸（μg）
         }
       }
     ]
