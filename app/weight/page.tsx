@@ -205,20 +205,12 @@ export default function WeightPage() {
               <p className="text-xs font-semibold text-gray-500">栄養素バランス（7日平均）</p>
               {isBeautyMode && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
             </div>
-            {/* 凡例 */}
-            <div className="flex items-center gap-3 mb-3 text-xs text-gray-400">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />達成</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />不足</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />要注意</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />未記録</span>
-            </div>
-
-            {/* ① TOP3 バー表示（最重要・常時） */}
+            {/* ① TOP3 バー表示（PFCと同スタイル） */}
             {(() => {
               const TOP3 = [
-                { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', accent: '#f97316' },
-                { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  accent: '#3b82f6' },
-                { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', accent: '#14b8a6' },
+                { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', bar: 'bg-orange-400' },
+                { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  bar: 'bg-blue-400'   },
+                { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', bar: 'bg-teal-400'   },
               ];
               return (
                 <div className="space-y-3 mb-4">
@@ -227,23 +219,18 @@ export default function WeightPage() {
                     const target = def?.target ?? 0;
                     const v = (avg.micros[item.key] as number) ?? 0;
                     const pct = Math.min(100, Math.round(v / target * 100));
-                    const status = v === 0 ? 'none' : pct >= 80 ? 'ok' : pct >= 20 ? 'low' : 'critical';
-                    const statusLabel = { ok: '✅ 達成', low: '⚠️ 不足', critical: '❌ 要注意', none: '○ 未記録' }[status];
-                    const statusColor = { ok: 'text-emerald-600', low: 'text-amber-500', critical: 'text-red-500', none: 'text-gray-400' }[status];
-                    const barColor = { ok: item.accent, low: '#f59e0b', critical: '#ef4444', none: '#d1d5db' }[status];
+                    const ok = pct >= 80;
                     return (
-                      <div key={item.key} className="bg-gray-50 rounded-xl px-3 py-2.5">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.accent }} />
-                          <span className="text-sm font-semibold text-gray-700 flex-1">{item.label}</span>
-                          <span className={`text-xs font-semibold ${statusColor}`}>{statusLabel}</span>
-                          <span className="text-sm font-bold text-gray-800">{v}<span className="text-xs font-normal text-gray-400 ml-0.5">{item.unit}</span></span>
-                          <span className="text-xs text-gray-400">/ {target}</span>
+                      <div key={item.key}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-semibold text-gray-600">{item.label}</span>
+                          <span className={ok ? 'text-gray-500' : 'text-red-500 font-semibold'}>
+                            平均 {v}{item.unit} / 目標 {target}{item.unit}{!ok && ' ⚠️'}
+                          </span>
                         </div>
-                        <div className="h-2.5 bg-white rounded-full overflow-hidden border border-gray-200">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${ok ? item.bar : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
                         </div>
-                        <p className="text-right text-xs text-gray-400 mt-0.5">{pct}%</p>
                       </div>
                     );
                   })}
