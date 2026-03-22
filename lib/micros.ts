@@ -26,6 +26,8 @@ export const MICRO_DEFS: {
   { key: 'pantothenicAcid', label: 'パントテン酸', unit: 'mg', target: 5,    purpose: 'beauty' },
   { key: 'magnesium',       label: 'マグネシウム', unit: 'mg', target: 270,  purpose: 'beauty' },
   { key: 'selenium',        label: 'セレン',       unit: 'μg', target: 25,   purpose: 'beauty' },
+  // 骨密度・血管健康（美容モード）
+  { key: 'vitaminK2',       label: 'ビタミンK2',   unit: 'μg', target: 45,   purpose: 'beauty' },
 ];
 
 /** 表示するMICRO_DEFSをgoalPurpose・genderでフィルタリング＆目標値調整 */

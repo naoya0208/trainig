@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { Profile, ActivityLevel, GoalType, GoalPurpose, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight } from '@/lib/calc';
+import { Profile, ActivityLevel, GoalType, GoalPurpose, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight, getMenstrualPhase } from '@/lib/calc';
 import { localDate } from '@/lib/date';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
@@ -31,6 +31,7 @@ function ProfileContent() {
   const [manualBMR, setManualBMR] = useState('');
   const [appleWatch, setAppleWatch] = useState('');
   const [hasAppleWatch, setHasAppleWatch] = useState<boolean | undefined>(undefined);
+  const [lastPeriodDate, setLastPeriodDate] = useState('');
   const [aiAdvice, setAiAdvice] = useState<any>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -75,6 +76,7 @@ function ProfileContent() {
       setManualBMR(profile.manualBMR?.toString() ?? '');
       setAppleWatch(profile.appleWatchCalories?.toString() ?? '');
       setHasAppleWatch(profile.hasAppleWatch);
+      setLastPeriodDate(profile.lastPeriodDate ?? '');
     }
   }, [profile]);
 
@@ -96,6 +98,7 @@ function ProfileContent() {
       appleWatchCalories: parseFloat(appleWatch) || undefined,
       hasAppleWatch,
       goalPurpose,
+      lastPeriodDate: gender === 'female' && lastPeriodDate ? lastPeriodDate : undefined,
     };
   })();
 
@@ -357,6 +360,45 @@ function ProfileContent() {
           </div>
         )}
       </div>
+
+      {/* 月経周期（女性のみ） */}
+      {gender === 'female' && (
+        <div className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">🌸</span>
+            <div>
+              <h2 className="font-bold text-gray-800">月経周期</h2>
+              <p className="text-xs text-gray-400">フェーズに合わせてカロリー・栄養目標を最適化</p>
+            </div>
+          </div>
+          <label className="text-sm font-semibold text-gray-600 block mb-2">直近の生理開始日</label>
+          <input type="date" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 mb-3"
+            max={new Date().toISOString().split('T')[0]}
+            value={lastPeriodDate} onChange={e => setLastPeriodDate(e.target.value)} />
+          {lastPeriodDate && (() => {
+            const info = getMenstrualPhase(lastPeriodDate);
+            const phaseColors: Record<string, string> = {
+              menstrual: 'bg-red-50 border-red-200 text-red-700',
+              follicular: 'bg-green-50 border-green-200 text-green-700',
+              ovulation: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+              luteal: 'bg-purple-50 border-purple-200 text-purple-700',
+            };
+            const cls = phaseColors[info.phase];
+            return (
+              <div className={`rounded-xl border p-3 ${cls}`}>
+                <p className="font-bold text-sm mb-1">現在：{info.label}（第{info.day}日）</p>
+                {info.extraCalories > 0 && <p className="text-xs mb-2">📈 カロリー目標 +{info.extraCalories}kcal（代謝上昇を反映）</p>}
+                <ul className="space-y-0.5">
+                  {info.tips.map((t, i) => <li key={i} className="text-xs opacity-80">• {t}</li>)}
+                </ul>
+              </div>
+            );
+          })()}
+          {!lastPeriodDate && (
+            <p className="text-xs text-gray-400">入力すると、黄体期（生理前）のカロリー+200kcal調整、フェーズ別栄養アドバイスが有効になります。</p>
+          )}
+        </div>
+      )}
 
       {/* Apple Watch連携 */}
       <div className="bg-gray-900 rounded-2xl p-6 mb-4 text-white">

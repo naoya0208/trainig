@@ -44,7 +44,8 @@ export async function POST(req: NextRequest) {
           "niacin": ナイアシン（mg）,
           "pantothenicAcid": パントテン酸（mg）,
           "magnesium": マグネシウム（mg）,
-          "selenium": セレン（μg）
+          "selenium": セレン（μg）,
+          "vitaminK2": ビタミンK2（μg）
         }
       }
     ]

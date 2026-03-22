@@ -22,6 +22,12 @@ export interface MicroNutrients {
   pantothenicAcid?: number; // パントテン酸(B5) mg
   magnesium?: number;       // マグネシウム mg
   selenium?: number;        // セレン μg
+  vitaminK2?: number;       // ビタミンK2 μg（骨密度・血管健康）
+}
+
+export interface WaterEntry {
+  date: string; // YYYY-MM-DD
+  ml: number;   // その日の累計ml
 }
 
 export interface FoodEntry {
@@ -90,6 +96,7 @@ interface Store {
   customCategories: string[];
   weightEntries: WeightEntry[];
   workoutSessions: WorkoutSession[];
+  waterEntries: WaterEntry[];
   syncCode: string;
   syncing: boolean;
   setProfile: (p: Profile) => void;
@@ -108,6 +115,7 @@ interface Store {
   addFavoriteGroup: (g: FavoriteGroup) => void;
   updateFavoriteGroup: (id: string, updates: Partial<FavoriteGroup>) => void;
   removeFavoriteGroup: (id: string) => void;
+  addWater: (date: string, ml: number) => void;
   hydrate: () => void;
   setSyncCode: (code: string) => void;
   syncToCloud: () => Promise<void>;
@@ -118,6 +126,7 @@ const KEYS = {
   profile: 'ct_profile', food: 'ct_food', weight: 'ct_weight',
   workout: 'ct_workout', syncCode: 'ct_sync_code', savedFoods: 'ct_saved_foods',
   favoriteGroups: 'ct_fav_groups', customCategories: 'ct_custom_cats',
+  water: 'ct_water',
 };
 
 function save<T>(key: string, val: T) {
@@ -136,6 +145,7 @@ export const useStore = create<Store>((set, get) => ({
   customCategories: [],
   weightEntries: [],
   workoutSessions: [],
+  waterEntries: [],
   syncCode: '',
   syncing: false,
 
@@ -204,6 +214,15 @@ export const useStore = create<Store>((set, get) => ({
     get().syncToCloud();
   },
 
+  addWater: (date, ml) => {
+    const existing = get().waterEntries;
+    const idx = existing.findIndex(w => w.date === date);
+    const next = idx >= 0
+      ? existing.map((w, i) => i === idx ? { ...w, ml: w.ml + ml } : w)
+      : [...existing, { date, ml }];
+    set({ waterEntries: next }); save(KEYS.water, next);
+  },
+
   toggleFavorite: (id) => {
     const next = get().savedFoods.map(f => f.id === id ? { ...f, isFavorite: !f.isFavorite } : f);
     set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
@@ -262,6 +281,7 @@ export const useStore = create<Store>((set, get) => ({
       customCategories: load(KEYS.customCategories, []),
       weightEntries: load(KEYS.weight, []),
       workoutSessions: load(KEYS.workout, []),
+      waterEntries: load(KEYS.water, []),
       syncCode,
     });
     if (syncCode) get().loadFromCloud(syncCode);

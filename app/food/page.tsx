@@ -5,7 +5,7 @@ import { MICRO_DEFS } from '@/lib/micros';
 
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
-const FOOD_CATEGORIES = ['主食', '主菜', '副菜', '乳製品', '果物', '飲み物', 'お菓子・間食', 'サプリ', 'その他'] as const;
+const FOOD_CATEGORIES = ['主食', '主菜', '副菜', '乳製品', '果物', '飲み物', 'お菓子・間食', 'サプリ', 'プロバイオティクス', 'その他'] as const;
 type FoodCategory = typeof FOOD_CATEGORIES[number];
 
 import { localDate, localDateOffset } from '@/lib/date';
@@ -18,11 +18,11 @@ interface AIFood { name: string; note?: string; ingredients: Ingredient[]; }
 function scaleMicros(m: MicroNutrients | undefined, r: number): MicroNutrients | undefined {
   if (!m) return undefined;
   const s = (v?: number) => v != null ? Math.round(v * r * 10) / 10 : undefined;
-  return { fiber: s(m.fiber), vitaminD: s(m.vitaminD), vitaminB12: s(m.vitaminB12), vitaminC: s(m.vitaminC), iron: s(m.iron), calcium: s(m.calcium), zinc: s(m.zinc), omega3: s(m.omega3), sodium: s(m.sodium), vitaminE: s(m.vitaminE), vitaminA: s(m.vitaminA), biotin: s(m.biotin), vitaminB2: s(m.vitaminB2), niacin: s(m.niacin), pantothenicAcid: s(m.pantothenicAcid), magnesium: s(m.magnesium), selenium: s(m.selenium) };
+  return { fiber: s(m.fiber), vitaminD: s(m.vitaminD), vitaminB12: s(m.vitaminB12), vitaminC: s(m.vitaminC), iron: s(m.iron), calcium: s(m.calcium), zinc: s(m.zinc), omega3: s(m.omega3), sodium: s(m.sodium), vitaminE: s(m.vitaminE), vitaminA: s(m.vitaminA), biotin: s(m.biotin), vitaminB2: s(m.vitaminB2), niacin: s(m.niacin), pantothenicAcid: s(m.pantothenicAcid), magnesium: s(m.magnesium), selenium: s(m.selenium), vitaminK2: s(m.vitaminK2) };
 }
 function addMicros(a: MicroNutrients, b: MicroNutrients | undefined): MicroNutrients {
   const add = (x?: number, y?: number) => x != null || y != null ? Math.round(((x ?? 0) + (y ?? 0)) * 10) / 10 : undefined;
-  return { fiber: add(a.fiber, b?.fiber), vitaminD: add(a.vitaminD, b?.vitaminD), vitaminB12: add(a.vitaminB12, b?.vitaminB12), vitaminC: add(a.vitaminC, b?.vitaminC), iron: add(a.iron, b?.iron), calcium: add(a.calcium, b?.calcium), zinc: add(a.zinc, b?.zinc), omega3: add(a.omega3, b?.omega3), sodium: add(a.sodium, b?.sodium), vitaminE: add(a.vitaminE, b?.vitaminE), vitaminA: add(a.vitaminA, b?.vitaminA), biotin: add(a.biotin, b?.biotin), vitaminB2: add(a.vitaminB2, b?.vitaminB2), niacin: add(a.niacin, b?.niacin), pantothenicAcid: add(a.pantothenicAcid, b?.pantothenicAcid), magnesium: add(a.magnesium, b?.magnesium), selenium: add(a.selenium, b?.selenium) };
+  return { fiber: add(a.fiber, b?.fiber), vitaminD: add(a.vitaminD, b?.vitaminD), vitaminB12: add(a.vitaminB12, b?.vitaminB12), vitaminC: add(a.vitaminC, b?.vitaminC), iron: add(a.iron, b?.iron), calcium: add(a.calcium, b?.calcium), zinc: add(a.zinc, b?.zinc), omega3: add(a.omega3, b?.omega3), sodium: add(a.sodium, b?.sodium), vitaminE: add(a.vitaminE, b?.vitaminE), vitaminA: add(a.vitaminA, b?.vitaminA), biotin: add(a.biotin, b?.biotin), vitaminB2: add(a.vitaminB2, b?.vitaminB2), niacin: add(a.niacin, b?.niacin), pantothenicAcid: add(a.pantothenicAcid, b?.pantothenicAcid), magnesium: add(a.magnesium, b?.magnesium), selenium: add(a.selenium, b?.selenium), vitaminK2: add(a.vitaminK2, b?.vitaminK2) };
 }
 function scaleIngredient(ing: Ingredient, newGrams: number): Ingredient {
   if (ing.grams === 0) return { ...ing, grams: newGrams };

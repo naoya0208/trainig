@@ -18,6 +18,42 @@ export interface Profile {
   hasAppleWatch?: boolean;     // Apple Watch所持確認
   manualBMR?: number;          // 体組成計などによる基礎代謝手動入力
   goalPurpose?: GoalPurpose;   // 重視する目的（筋肉 or 美容）
+  lastPeriodDate?: string;     // 直近の生理開始日（YYYY-MM-DD）
+}
+
+export type MenstrualPhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal';
+
+export interface MenstrualPhaseInfo {
+  phase: MenstrualPhase;
+  label: string;
+  day: number;        // 周期の何日目か
+  extraCalories: number; // 黄体期は+100-300kcal
+  tips: string[];
+}
+
+/** 月経周期フェーズを計算（女性のみ）*/
+export function getMenstrualPhase(lastPeriodDate: string): MenstrualPhaseInfo {
+  const start = new Date(lastPeriodDate);
+  const today = new Date();
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / 86400000);
+  const day = (diffDays % 28) + 1; // 1〜28日目
+
+  if (day <= 5) return {
+    phase: 'menstrual', label: '月経期', day, extraCalories: 0,
+    tips: ['鉄分・亜鉛を意識して補給', 'ショウガ・温かい食事で血行促進', '無理な運動は避けゆっくり過ごす'],
+  };
+  if (day <= 13) return {
+    phase: 'follicular', label: '卵胞期', day, extraCalories: 0,
+    tips: ['エネルギー代謝が高まる時期', 'タンパク質・鉄分でコラーゲン合成を促進', '運動効果が出やすいタイミング'],
+  };
+  if (day === 14) return {
+    phase: 'ovulation', label: '排卵期', day, extraCalories: 0,
+    tips: ['亜鉛・ビタミンB群で排卵をサポート', '代謝が最も高い時期', '筋トレの効果が出やすい'],
+  };
+  return {
+    phase: 'luteal', label: '黄体期', day, extraCalories: 200,
+    tips: ['基礎代謝が+100〜300kcal上昇', 'マグネシウム・ビタミンB6でPMS緩和', '糖質・脂質への欲求が増すが意識して腸活食品を'],
+  };
 }
 
 /** 目標体脂肪率が設定されている場合は除脂肪体重維持で目標体重を算出 */
@@ -82,6 +118,11 @@ export function calcTargetCalories(p: Profile): {
   const isUnsafe = Math.abs(weeklyChange) > maxWeekly;
   const safe = isUnsafe ? Math.sign(weeklyChange) * maxWeekly : weeklyChange;
   let targetCalories = Math.round(tdee + (safe * 7200) / 7);
+  // 黄体期（月経開始から15日目以降）はカロリー目標+200kcal（代謝上昇を反映）
+  if (p.gender === 'female' && p.lastPeriodDate) {
+    const { phase } = getMenstrualPhase(p.lastPeriodDate);
+    if (phase === 'luteal') targetCalories += 200;
+  }
   const isMinCal = targetCalories < minCal;
   if (isMinCal) targetCalories = minCal;
   return { targetCalories, weeklyChange: safe, daysLeft, isUnsafe, isMinCal, isGoalMismatch: false };

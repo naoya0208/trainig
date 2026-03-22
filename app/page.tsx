@@ -2,14 +2,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
-import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets } from '@/lib/calc';
+import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets, getMenstrualPhase } from '@/lib/calc';
 import { getActiveMicroDefs, sumMicros } from '@/lib/micros';
 
 import { localDate } from '@/lib/date';
 function getToday() { return localDate(); }
 
 export default function Home() {
-  const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate, setProfile } = useStore();
+  const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate, setProfile, waterEntries, addWater } = useStore();
   const [today, setToday] = useState(getToday);
   const [advice, setAdvice] = useState<{ status: string; message: string; tips: string[] } | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
@@ -62,6 +62,10 @@ export default function Home() {
 
   const todayFood = foodEntries.filter(e => e.date === today);
   const todayWork = workoutSessions.filter(s => s.date === today);
+  const todayWaterMl = waterEntries.find(w => w.date === today)?.ml ?? 0;
+  const waterTargetMl = Math.round(profile.weight * 30); // 体重×30ml/日
+  const menstrualInfo = profile.gender === 'female' && profile.lastPeriodDate
+    ? getMenstrualPhase(profile.lastPeriodDate) : null;
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
   const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);
   const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose, profile.gender);
@@ -73,6 +77,20 @@ export default function Home() {
   const fat = todayFood.reduce((s, e) => s + e.fat, 0);
   const carbs = todayFood.reduce((s, e) => s + e.carbs, 0);
   const todayMicros = sumMicros(todayFood);
+
+  // 食事タイミング判定
+  const currentHour = new Date().getHours();
+  const mealTimingStatus = (() => {
+    const hasBreakfast = todayFood.some(e => e.meal === 'breakfast');
+    const hasLunch = todayFood.some(e => e.meal === 'lunch');
+    const hasDinner = todayFood.some(e => e.meal === 'dinner');
+    const slots = [
+      { id: 'breakfast', label: '朝食', done: hasBreakfast, ideal: '7〜9時', warning: !hasBreakfast && currentHour >= 10 },
+      { id: 'lunch',     label: '昼食', done: hasLunch,     ideal: '12〜13時', warning: !hasLunch && currentHour >= 14 },
+      { id: 'dinner',    label: '夕食', done: hasDinner,    ideal: '18〜20時', warning: !hasDinner && currentHour >= 21 },
+    ];
+    return slots;
+  })();
 
   async function getNutritionAdvice() {
     setLoadingNutrition(true);
@@ -167,6 +185,29 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* 月経フェーズバナー（女性かつ設定済み） */}
+      {menstrualInfo && (() => {
+        const phaseConfig = {
+          menstrual:  { bg: 'bg-red-50    border-red-200',    icon: '🔴', color: 'text-red-600'    },
+          follicular: { bg: 'bg-green-50  border-green-200',  icon: '🌱', color: 'text-green-600'  },
+          ovulation:  { bg: 'bg-yellow-50 border-yellow-200', icon: '⭐', color: 'text-yellow-600' },
+          luteal:     { bg: 'bg-purple-50 border-purple-200', icon: '🌙', color: 'text-purple-600' },
+        }[menstrualInfo.phase];
+        return (
+          <div className={`rounded-2xl border p-3 mb-4 flex items-start gap-3 ${phaseConfig.bg}`}>
+            <span className="text-xl mt-0.5">{phaseConfig.icon}</span>
+            <div className="flex-1">
+              <p className={`text-sm font-bold ${phaseConfig.color}`}>{menstrualInfo.label}（第{menstrualInfo.day}日）</p>
+              <p className="text-xs text-gray-500 mt-0.5">{menstrualInfo.tips[0]}</p>
+              {menstrualInfo.extraCalories > 0 && (
+                <p className={`text-xs font-semibold mt-1 ${phaseConfig.color}`}>📈 目標カロリー +{menstrualInfo.extraCalories}kcal（代謝上昇分）</p>
+              )}
+            </div>
+            <Link href="/profile" className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5">設定 →</Link>
+          </div>
+        );
+      })()}
 
       {/* Apple Watch未設定の場合は設定促し */}
       {profile.hasAppleWatch === undefined && !appleWatchActive && (
@@ -473,6 +514,57 @@ export default function Home() {
               </div>
             )}
           </div>
+        )}
+      </div>
+
+      {/* 食事タイミング */}
+      <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+        <p className="text-sm font-semibold text-gray-500 mb-3">食事タイミング</p>
+        <div className="flex gap-2">
+          {mealTimingStatus.map(slot => (
+            <div key={slot.id} className={`flex-1 rounded-xl px-2 py-2.5 text-center border ${slot.done ? 'bg-green-50 border-green-200' : slot.warning ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+              <p className="text-lg leading-none mb-1">{slot.done ? '✅' : slot.warning ? '⚠️' : '○'}</p>
+              <p className={`text-xs font-semibold ${slot.done ? 'text-green-600' : slot.warning ? 'text-red-500' : 'text-gray-400'}`}>{slot.label}</p>
+              <p className="text-xs text-gray-300 mt-0.5">{slot.ideal}</p>
+            </div>
+          ))}
+        </div>
+        {mealTimingStatus.some(s => s.warning) && (
+          <p className="text-xs text-red-400 mt-2">⚠️ 朝食スキップはコルチゾール上昇→食欲増加の原因になります</p>
+        )}
+      </div>
+
+      {/* 水分摂取トラッカー */}
+      <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+        <div className="flex justify-between items-center mb-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-500">水分摂取</p>
+            <p className="text-xs text-gray-400 mt-0.5">目標：{(waterTargetMl / 1000).toFixed(1)}L（体重×30ml）</p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-blue-500">{todayWaterMl >= 1000 ? `${(todayWaterMl / 1000).toFixed(1)}L` : `${todayWaterMl}ml`}</p>
+            <p className="text-xs text-gray-400">{Math.min(100, Math.round(todayWaterMl / waterTargetMl * 100))}%</p>
+          </div>
+        </div>
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+          <div className="h-full rounded-full bg-blue-400 transition-all duration-500"
+            style={{ width: `${Math.min(100, Math.round(todayWaterMl / waterTargetMl * 100))}%` }} />
+        </div>
+        <div className="flex gap-2">
+          {[200, 350, 500].map(ml => (
+            <button key={ml} onClick={() => addWater(today, ml)}
+              className="flex-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl py-2 text-sm font-semibold text-blue-600 transition">
+              +{ml}ml
+            </button>
+          ))}
+          <button onClick={() => addWater(today, -Math.min(200, todayWaterMl))}
+            disabled={todayWaterMl === 0}
+            className="px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl py-2 text-sm font-semibold text-gray-400 transition disabled:opacity-30">
+            −
+          </button>
+        </div>
+        {todayWaterMl >= waterTargetMl && (
+          <p className="text-xs text-blue-500 mt-2 text-center">💧 今日の水分目標達成！肌のうるおいをサポート</p>
         )}
       </div>
 
