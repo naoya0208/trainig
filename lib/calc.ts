@@ -19,6 +19,9 @@ export interface Profile {
   manualBMR?: number;          // 体組成計などによる基礎代謝手動入力
   goalPurpose?: GoalPurpose;   // 重視する目的（筋肉 or 美容）
   lastPeriodDate?: string;     // 直近の生理開始日（YYYY-MM-DD）
+  isIrregularCycle?: boolean;  // 生理不順・不定期
+  cycleLength?: number;        // 平均周期日数（デフォルト28）
+  medications?: string[];      // 服用中の薬キー（MedicationKey[]）
 }
 
 export type MenstrualPhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal';
@@ -31,22 +34,30 @@ export interface MenstrualPhaseInfo {
   tips: string[];
 }
 
-/** 月経周期フェーズを計算（女性のみ）*/
-export function getMenstrualPhase(lastPeriodDate: string): MenstrualPhaseInfo {
+/** 月経周期フェーズを計算（女性のみ）
+ * @param lastPeriodDate 直近の生理開始日
+ * @param cycleLength 平均周期日数（デフォルト28、不定期の場合は実際の平均を入力）
+ */
+export function getMenstrualPhase(lastPeriodDate: string, cycleLength = 28): MenstrualPhaseInfo {
+  const cl = Math.max(21, Math.min(40, cycleLength)); // 21〜40日の範囲に制限
   const start = new Date(lastPeriodDate);
   const today = new Date();
   const diffDays = Math.floor((today.getTime() - start.getTime()) / 86400000);
-  const day = (diffDays % 28) + 1; // 1〜28日目
+  const day = (diffDays % cl) + 1; // 1〜cl日目
+
+  // 黄体期は排卵後〜次の生理まで（排卵は周期の約14日前＝lutealStart）
+  const ovulationDay = cl - 14; // 排卵日（周期によって変動）
+  const follicularEnd = ovulationDay - 1;
 
   if (day <= 5) return {
     phase: 'menstrual', label: '月経期', day, extraCalories: 0,
     tips: ['鉄分・亜鉛を意識して補給', 'ショウガ・温かい食事で血行促進', '無理な運動は避けゆっくり過ごす'],
   };
-  if (day <= 13) return {
+  if (day <= follicularEnd) return {
     phase: 'follicular', label: '卵胞期', day, extraCalories: 0,
     tips: ['エネルギー代謝が高まる時期', 'タンパク質・鉄分でコラーゲン合成を促進', '運動効果が出やすいタイミング'],
   };
-  if (day === 14) return {
+  if (day === ovulationDay) return {
     phase: 'ovulation', label: '排卵期', day, extraCalories: 0,
     tips: ['亜鉛・ビタミンB群で排卵をサポート', '代謝が最も高い時期', '筋トレの効果が出やすい'],
   };
@@ -118,9 +129,10 @@ export function calcTargetCalories(p: Profile): {
   const isUnsafe = Math.abs(weeklyChange) > maxWeekly;
   const safe = isUnsafe ? Math.sign(weeklyChange) * maxWeekly : weeklyChange;
   let targetCalories = Math.round(tdee + (safe * 7200) / 7);
-  // 黄体期（月経開始から15日目以降）はカロリー目標+200kcal（代謝上昇を反映）
-  if (p.gender === 'female' && p.lastPeriodDate) {
-    const { phase } = getMenstrualPhase(p.lastPeriodDate);
+  // 黄体期（月経開始から排卵後〜次の生理まで）はカロリー目標+200kcal（代謝上昇を反映）
+  // 不定期の場合は計算精度が下がるため参考値扱い
+  if (p.gender === 'female' && p.lastPeriodDate && !p.isIrregularCycle) {
+    const { phase } = getMenstrualPhase(p.lastPeriodDate, p.cycleLength);
     if (phase === 'luteal') targetCalories += 200;
   }
   const isMinCal = targetCalories < minCal;

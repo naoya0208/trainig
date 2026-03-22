@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcCalorieLimits, calcNutritionTargets, getMenstrualPhase } from '@/lib/calc';
+import { MEDICATION_DEFS, getAffectedNutrients } from '@/lib/medications';
 import { getActiveMicroDefs, sumMicros } from '@/lib/micros';
 
 import { localDate } from '@/lib/date';
@@ -65,7 +66,11 @@ export default function Home() {
   const todayWaterMl = waterEntries.find(w => w.date === today)?.ml ?? 0;
   const waterTargetMl = Math.round(profile.weight * 30); // 体重×30ml/日
   const menstrualInfo = profile.gender === 'female' && profile.lastPeriodDate
-    ? getMenstrualPhase(profile.lastPeriodDate) : null;
+    ? getMenstrualPhase(profile.lastPeriodDate, profile.cycleLength) : null;
+  const activeMedications = (profile.medications ?? [])
+    .map(k => MEDICATION_DEFS.find(d => d.key === k))
+    .filter(Boolean) as typeof MEDICATION_DEFS;
+  const affectedNutrients = getAffectedNutrients(profile.medications ?? []);
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
   const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);
   const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose, profile.gender);
@@ -198,9 +203,12 @@ export default function Home() {
           <div className={`rounded-2xl border p-3 mb-4 flex items-start gap-3 ${phaseConfig.bg}`}>
             <span className="text-xl mt-0.5">{phaseConfig.icon}</span>
             <div className="flex-1">
-              <p className={`text-sm font-bold ${phaseConfig.color}`}>{menstrualInfo.label}（第{menstrualInfo.day}日）</p>
+              <p className={`text-sm font-bold ${phaseConfig.color}`}>{menstrualInfo.label}（第{menstrualInfo.day}日 / 周期{profile.cycleLength ?? 28}日）</p>
+              {profile.isIrregularCycle && (
+                <p className="text-xs text-gray-400 mt-0.5">🌸 不定期モード（参考表示）</p>
+              )}
               <p className="text-xs text-gray-500 mt-0.5">{menstrualInfo.tips[0]}</p>
-              {menstrualInfo.extraCalories > 0 && (
+              {!profile.isIrregularCycle && menstrualInfo.extraCalories > 0 && (
                 <p className={`text-xs font-semibold mt-1 ${phaseConfig.color}`}>📈 目標カロリー +{menstrualInfo.extraCalories}kcal（代謝上昇分）</p>
               )}
             </div>
@@ -208,6 +216,51 @@ export default function Home() {
           </div>
         );
       })()}
+
+      {/* 服薬バナー */}
+      {activeMedications.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">💊</span>
+            <p className="text-sm font-bold text-orange-700">服薬中の栄養管理</p>
+            <Link href="/profile" className="ml-auto text-xs text-orange-400 hover:text-orange-600">編集 →</Link>
+          </div>
+          {/* 薬ごとの注意事項（折りたたみ） */}
+          <div className="space-y-2 mb-3">
+            {activeMedications.map(med => (
+              <div key={med.key} className="bg-white rounded-xl p-3 border border-orange-100">
+                <p className="text-xs font-bold text-orange-600 mb-1">{med.icon} {med.label}</p>
+                <ul className="space-y-0.5">
+                  {med.recommendations.slice(0, 2).map((r, i) => (
+                    <li key={i} className="text-xs text-gray-600">• {r}</li>
+                  ))}
+                  {med.avoid && med.avoid.map((a, i) => (
+                    <li key={`a${i}`} className="text-xs text-red-500">⚠️ {a}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          {/* 影響を受ける栄養素 */}
+          {affectedNutrients.size > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-orange-600 mb-2">薬による消耗が懸念される栄養素</p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(affectedNutrients.entries()).map(([key, info]) => (
+                  <div key={key} className={`rounded-lg px-2 py-1 text-xs font-semibold border ${
+                    info.severity === 'high' ? 'bg-red-50 border-red-200 text-red-600' :
+                    info.severity === 'medium' ? 'bg-orange-50 border-orange-200 text-orange-600' :
+                    'bg-yellow-50 border-yellow-200 text-yellow-600'
+                  }`}>
+                    {info.severity === 'high' ? '🔴' : info.severity === 'medium' ? '🟡' : '🟢'} {info.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-gray-400 mt-3">※ 一般的な参考情報です。食事・服薬の詳細は医師・薬剤師にご相談ください。</p>
+        </div>
+      )}
 
       {/* Apple Watch未設定の場合は設定促し */}
       {profile.hasAppleWatch === undefined && !appleWatchActive && (

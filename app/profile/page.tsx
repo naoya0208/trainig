@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { Profile, ActivityLevel, GoalType, GoalPurpose, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight, getMenstrualPhase } from '@/lib/calc';
+import { MEDICATION_DEFS, MedicationKey } from '@/lib/medications';
 import { localDate } from '@/lib/date';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
@@ -32,6 +33,9 @@ function ProfileContent() {
   const [appleWatch, setAppleWatch] = useState('');
   const [hasAppleWatch, setHasAppleWatch] = useState<boolean | undefined>(undefined);
   const [lastPeriodDate, setLastPeriodDate] = useState('');
+  const [isIrregularCycle, setIsIrregularCycle] = useState(false);
+  const [cycleLength, setCycleLength] = useState('28');
+  const [medications, setMedications] = useState<string[]>([]);
   const [aiAdvice, setAiAdvice] = useState<any>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -77,6 +81,9 @@ function ProfileContent() {
       setAppleWatch(profile.appleWatchCalories?.toString() ?? '');
       setHasAppleWatch(profile.hasAppleWatch);
       setLastPeriodDate(profile.lastPeriodDate ?? '');
+      setIsIrregularCycle(profile.isIrregularCycle ?? false);
+      setCycleLength(profile.cycleLength?.toString() ?? '28');
+      setMedications(profile.medications ?? []);
     }
   }, [profile]);
 
@@ -99,6 +106,9 @@ function ProfileContent() {
       hasAppleWatch,
       goalPurpose,
       lastPeriodDate: gender === 'female' && lastPeriodDate ? lastPeriodDate : undefined,
+      isIrregularCycle: gender === 'female' ? isIrregularCycle : undefined,
+      cycleLength: gender === 'female' && !isIrregularCycle ? parseInt(cycleLength) || 28 : undefined,
+      medications: medications.length > 0 ? medications : undefined,
     };
   })();
 
@@ -371,12 +381,42 @@ function ProfileContent() {
               <p className="text-xs text-gray-400">フェーズに合わせてカロリー・栄養目標を最適化</p>
             </div>
           </div>
-          <label className="text-sm font-semibold text-gray-600 block mb-2">直近の生理開始日</label>
-          <input type="date" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 mb-3"
-            max={new Date().toISOString().split('T')[0]}
-            value={lastPeriodDate} onChange={e => setLastPeriodDate(e.target.value)} />
+          {/* 不定期トグル */}
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-semibold text-gray-600">不定期・生理不順</label>
+            <button onClick={() => setIsIrregularCycle(!isIrregularCycle)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isIrregularCycle ? 'bg-pink-400' : 'bg-gray-200'}`}>
+              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${isIrregularCycle ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          {isIrregularCycle && (
+            <div className="bg-pink-50 border border-pink-100 rounded-xl px-3 py-3 mb-3 text-xs text-pink-700 space-y-1">
+              <p className="font-semibold">🌸 不定期モード</p>
+              <p>• フェーズ別カロリー自動調整はオフになります</p>
+              <p>• 参考として平均周期日数を入力すると目安表示に使います</p>
+              <p>• 生理不順はストレス・栄養不足・体重変化が原因のことが多いです</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 block mb-1">直近の生理開始日</label>
+              <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                max={new Date().toISOString().split('T')[0]}
+                value={lastPeriodDate} onChange={e => setLastPeriodDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 block mb-1">平均周期日数{isIrregularCycle ? '（目安）' : ''}</label>
+              <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-3">
+                <input className="flex-1 py-2.5 text-lg font-bold bg-transparent focus:outline-none"
+                  type="number" placeholder="28" min="21" max="40"
+                  value={cycleLength} onChange={e => setCycleLength(e.target.value)} />
+                <span className="text-sm text-gray-400">日</span>
+              </div>
+            </div>
+          </div>
           {lastPeriodDate && (() => {
-            const info = getMenstrualPhase(lastPeriodDate);
+            const cl = parseInt(cycleLength) || 28;
+            const info = getMenstrualPhase(lastPeriodDate, cl);
             const phaseColors: Record<string, string> = {
               menstrual: 'bg-red-50 border-red-200 text-red-700',
               follicular: 'bg-green-50 border-green-200 text-green-700',
@@ -387,18 +427,65 @@ function ProfileContent() {
             return (
               <div className={`rounded-xl border p-3 ${cls}`}>
                 <p className="font-bold text-sm mb-1">現在：{info.label}（第{info.day}日）</p>
-                {info.extraCalories > 0 && <p className="text-xs mb-2">📈 カロリー目標 +{info.extraCalories}kcal（代謝上昇を反映）</p>}
-                <ul className="space-y-0.5">
-                  {info.tips.map((t, i) => <li key={i} className="text-xs opacity-80">• {t}</li>)}
-                </ul>
-              </div>
-            );
+                {!isIrregularCycle && info.extraCalories > 0 && (
+                <p className="text-xs mb-2">📈 カロリー目標 +{info.extraCalories}kcal（代謝上昇を反映）</p>
+              )}
+              {isIrregularCycle && (
+                <p className="text-xs mb-2 opacity-70">⚠️ 不定期モードのため自動カロリー調整はオフです（参考表示）</p>
+              )}
+              <ul className="space-y-0.5">
+                {info.tips.map((t, i) => <li key={i} className="text-xs opacity-80">• {t}</li>)}
+              </ul>
+            </div>
+          );
           })()}
           {!lastPeriodDate && (
-            <p className="text-xs text-gray-400">入力すると、黄体期（生理前）のカロリー+200kcal調整、フェーズ別栄養アドバイスが有効になります。</p>
+            <p className="text-xs text-gray-400">生理開始日を入力すると、フェーズ別栄養アドバイスと黄体期カロリー+200kcal調整が有効になります。</p>
           )}
         </div>
       )}
+
+      {/* 服薬・薬の情報 */}
+      <div className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-2xl">💊</span>
+          <div>
+            <h2 className="font-bold text-gray-800">服薬情報</h2>
+            <p className="text-xs text-gray-400">薬と栄養の相互作用を考慮した摂取アドバイスを表示</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {MEDICATION_DEFS.map(med => {
+            const isSelected = medications.includes(med.key);
+            return (
+              <button key={med.key}
+                onClick={() => setMedications(prev =>
+                  isSelected ? prev.filter(k => k !== med.key) : [...prev, med.key]
+                )}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition text-left ${
+                  isSelected ? 'bg-orange-50 border-orange-300' : 'border-gray-100 hover:bg-gray-50'
+                }`}>
+                <span className="text-lg flex-shrink-0">{med.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold ${isSelected ? 'text-orange-700' : 'text-gray-700'}`}>{med.label}</p>
+                  <p className="text-xs text-gray-400">{med.category}</p>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                  isSelected ? 'border-orange-400 bg-orange-400' : 'border-gray-300'
+                }`}>
+                  {isSelected && <span className="text-white text-xs font-bold">✓</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {medications.length > 0 && (
+          <p className="text-xs text-orange-600 bg-orange-50 rounded-xl px-3 py-2 mt-3">
+            💊 {medications.length}種の薬を登録中。ホーム画面で栄養への影響を確認できます。
+          </p>
+        )}
+        <p className="text-xs text-gray-400 mt-3">※ このアプリの情報は一般的な参考情報です。服薬中の食事管理は必ず医師・薬剤師に相談してください。</p>
+      </div>
 
       {/* Apple Watch連携 */}
       <div className="bg-gray-900 rounded-2xl p-6 mb-4 text-white">
