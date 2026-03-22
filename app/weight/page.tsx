@@ -175,6 +175,7 @@ export default function WeightPage() {
           <p className="text-xs text-gray-300 mb-4">{recordedDays.length}日分の記録から算出</p>
 
           {/* PFC平均 */}
+          <p className="text-xs font-semibold text-gray-400 mb-2">マクロ栄養素</p>
           <div className="space-y-3 mb-4">
             {[
               { label: 'タンパク質', avg: avg.protein, target: nutritionTargets.protein, unit: 'g', bar: 'bg-blue-400' },
@@ -199,10 +200,10 @@ export default function WeightPage() {
             })}
           </div>
 
-          {/* 栄養素バランス（7日平均） */}
+          {/* ビタミン・ミネラル（PFCに続けて表示） */}
           <div className="border-t border-gray-100 pt-3">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-xs font-semibold text-gray-500">栄養素バランス（7日平均）</p>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs font-semibold text-gray-400">ビタミン・ミネラル</p>
               {isBeautyMode && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
             </div>
             {/* ① TOP3 バー表示（PFCと同スタイル） */}

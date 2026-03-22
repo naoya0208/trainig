@@ -476,7 +476,7 @@ export default function Home() {
           })}
           <p className="text-xs text-gray-300 mt-1">バーの縦線 = 推奨目標 / バー右端 = 上限</p>
 
-          {/* 美容バランス */}
+          {/* ビタミン・ミネラル（PFCに続けて表示） */}
           {(() => {
             const isBeauty = profile.goalPurpose === 'beauty';
             const getTarget = (key: string) => MICRO_DEFS.find(d => d.key === key)?.target ?? 0;
@@ -485,17 +485,15 @@ export default function Home() {
               { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  bar: 'bg-blue-400'   },
               { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', bar: 'bg-teal-400'   },
             ];
-            // 美容モード高優先度4種（常時表示）
             const SUB4 = isBeauty
               ? MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'high')
               : [];
             return (
-              <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="mt-4 pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2 mb-3">
-                  <p className="text-xs font-semibold text-gray-400">美容バランス</p>
+                  <p className="text-xs font-semibold text-gray-400">ビタミン・ミネラル</p>
                   {isBeauty && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
                 </div>
-                {/* Top3 バー（PFCと同スタイル） */}
                 <div className="space-y-3 mb-3">
                   {TOP3.map(item => {
                     const target = getTarget(item.key);
@@ -517,7 +515,6 @@ export default function Home() {
                     );
                   })}
                 </div>
-                {/* 美容モード高優先度4種（囲みグリッド） */}
                 {SUB4.length > 0 && (
                   <div className="bg-pink-50/60 border border-pink-100 rounded-xl p-3">
                     <div className="grid grid-cols-4 gap-2">
@@ -541,7 +538,6 @@ export default function Home() {
                     </div>
                   </div>
                 )}
-                {/* 美容モード低優先度（折りたたみ） */}
                 {isBeauty && (() => {
                   const lowDefs = MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'low');
                   if (lowDefs.length === 0) return null;
