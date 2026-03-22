@@ -304,7 +304,12 @@ function ProfileContent() {
             ['muscle', '💪 筋肉・パフォーマンス'],
             ['beauty', '✨ 美容・スキンケア'],
           ] as const).map(([v, l]) => (
-            <button key={v} onClick={() => setGoalPurpose(goalPurpose === v ? undefined : v)}
+            <button key={v} onClick={() => {
+                const next = goalPurpose === v ? undefined : v;
+                setGoalPurpose(next);
+                // 美容モードに切り替えた場合、増量は非対応のため維持にリセット
+                if (next === 'beauty' && goalType === 'gain') setGoalType('maintain');
+              }}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${goalPurpose === v ? (v === 'beauty' ? 'bg-pink-500 text-white' : 'bg-blue-600 text-white') : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {l}
             </button>
@@ -322,14 +327,27 @@ function ProfileContent() {
         )}
 
         <label className="text-sm font-semibold text-gray-600 block mb-2">目標の種類</label>
-        <div className="flex gap-2 mb-4">
-          {([['lose','減量'],['maintain','維持'],['gain','増量']] as const).map(([v,l]) => (
+        <div className="flex gap-2 mb-2">
+          {(goalPurpose === 'beauty'
+            ? [['lose','ダイエット'],['maintain','維持']] as const
+            : [['lose','減量'],['maintain','維持'],['gain','増量']] as const
+          ).map(([v,l]) => (
             <button key={v} onClick={() => setGoalType(v)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${goalType === v ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${goalType === v ? (goalPurpose === 'beauty' ? 'bg-pink-500 text-white' : 'bg-blue-600 text-white') : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {l}
             </button>
           ))}
         </div>
+        {goalPurpose === 'beauty' && goalType === 'lose' && (
+          <p className="text-xs text-pink-500 bg-pink-50 rounded-xl px-3 py-2 mb-3">
+            ✨ 週-0.5kgまでの緩やかなペース。急激な減量は肌荒れ・抜け毛の原因になります。
+          </p>
+        )}
+        {goalPurpose !== 'beauty' && goalType === 'lose' && (
+          <p className="text-xs text-blue-400 bg-blue-50 rounded-xl px-3 py-2 mb-3">
+            💪 週-1.0kgまで対応。筋肉を維持しながら脂肪を落とすモードです。
+          </p>
+        )}
         {goalType !== 'maintain' && (
           <div>
             <label className="text-sm font-semibold text-gray-600 block mb-2">目標達成日</label>
@@ -438,8 +456,8 @@ function ProfileContent() {
             </div>
           </div>
           {ti.isGoalMismatch && <p className="text-xs text-red-700 bg-red-50 rounded-lg p-2 mt-3">⚠️ 目標体重と目標の種類が一致していません。減量なら目標体重を現在の体重より低く設定してください。</p>}
-          {ti.isMinCal && <p className="text-xs text-orange-700 bg-orange-50 rounded-lg p-2 mt-3">⚠️ 計算結果が最低カロリー下限（{preview?.gender === 'female' ? '1,200' : '1,500'}kcal）を下回るため、下限値を適用しています。目標日を延長してください。</p>}
-          {ti.isUnsafe && !ti.isMinCal && <p className="text-xs text-yellow-700 bg-yellow-50 rounded-lg p-2 mt-3">⚠️ ペースが速すぎます（週1kg超）。週1kgに制限して計算しています。目標日を延長してください。</p>}
+          {ti.isMinCal && <p className="text-xs text-orange-700 bg-orange-50 rounded-lg p-2 mt-3">⚠️ 計算結果が最低カロリー下限（{preview?.goalPurpose === 'beauty' ? '1,400' : preview?.gender === 'female' ? '1,200' : '1,500'}kcal）を下回るため、下限値を適用しています。目標日を延長してください。</p>}
+          {ti.isUnsafe && !ti.isMinCal && <p className="text-xs text-yellow-700 bg-yellow-50 rounded-lg p-2 mt-3">⚠️ ペースが速すぎます（{preview?.goalPurpose === 'beauty' ? '週0.5kg超' : '週1kg超'}）。{preview?.goalPurpose === 'beauty' ? '週0.5kg' : '週1kg'}に制限して計算しています。目標日を延長してください。</p>}
         </div>
       )}
 

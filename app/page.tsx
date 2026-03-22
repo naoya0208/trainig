@@ -137,7 +137,9 @@ export default function Home() {
 
       {isUnsafe && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4 text-sm text-yellow-800">
-          ⚠️ 設定したペースが速すぎます。目標日の延長をおすすめします。
+          {profile.goalPurpose === 'beauty'
+            ? '⚠️ ダイエットのペースが速すぎます（週0.5kg超）。肌荒れ・抜け毛を防ぐため、目標日を延長してください。'
+            : '⚠️ 設定したペースが速すぎます（週1kg超）。目標日の延長をおすすめします。'}
         </div>
       )}
 

@@ -62,7 +62,8 @@ export function calcTargetCalories(p: Profile): {
   isGoalMismatch: boolean; // 目標と体重の方向が逆
 } {
   const tdee = calcTDEE(p);
-  const minCal = p.gender === 'female' ? 1200 : 1500;
+  // 美容ダイエットは最低カロリーを高めに設定（肌・髪の栄養を確保）
+  const minCal = p.goalPurpose === 'beauty' ? 1400 : p.gender === 'female' ? 1200 : 1500;
   if (p.goalType === 'maintain' || !p.targetDate) {
     return { targetCalories: tdee, weeklyChange: 0, daysLeft: null, isUnsafe: false, isMinCal: false, isGoalMismatch: false };
   }
@@ -76,8 +77,10 @@ export function calcTargetCalories(p: Profile): {
   }
   const daysLeft = Math.max(1, Math.round((new Date(p.targetDate).getTime() - Date.now()) / 86400000));
   const weeklyChange = (effectiveTarget - p.weight) / (daysLeft / 7);
-  const isUnsafe = Math.abs(weeklyChange) > 1.0;
-  const safe = isUnsafe ? Math.sign(weeklyChange) * 1.0 : weeklyChange;
+  // 美容ダイエットは緩やかな減量（週-0.5kgまで）：急激な減量は肌荒れ・抜け毛の原因
+  const maxWeekly = p.goalPurpose === 'beauty' && p.goalType === 'lose' ? 0.5 : 1.0;
+  const isUnsafe = Math.abs(weeklyChange) > maxWeekly;
+  const safe = isUnsafe ? Math.sign(weeklyChange) * maxWeekly : weeklyChange;
   let targetCalories = Math.round(tdee + (safe * 7200) / 7);
   const isMinCal = targetCalories < minCal;
   if (isMinCal) targetCalories = minCal;

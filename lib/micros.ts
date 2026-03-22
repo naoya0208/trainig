@@ -33,11 +33,14 @@ export function getActiveMicroDefs(goalPurpose?: string, gender?: string) {
   return MICRO_DEFS
     .filter(d => !d.purpose || d.purpose === goalPurpose)
     .map(d => {
-      if (goalPurpose !== 'beauty') return d;
-      // 美容モード: 特定栄養素の目標値を調整
-      if (d.key === 'vitaminC') return { ...d, target: 200 }; // コラーゲン合成・抗酸化に重要
-      if (d.key === 'iron' && gender === 'female') return { ...d, target: 10.5 }; // 月経による損失を考慮
-      if (d.key === 'fiber') return { ...d, target: 25 }; // 腸内環境→肌の健康（腸肌相関）
+      // 女性共通の調整（美容モード関係なく適用）
+      if (d.key === 'iron' && gender === 'female') return { ...d, target: 10.5 };   // 月経による損失
+      if (d.key === 'calcium' && gender === 'female') return { ...d, target: 700 }; // 骨粗鬆症リスク
+      // 美容モード追加調整
+      if (goalPurpose === 'beauty') {
+        if (d.key === 'vitaminC') return { ...d, target: 200 }; // コラーゲン合成・抗酸化
+        if (d.key === 'fiber') return { ...d, target: 25 };     // 腸肌相関
+      }
       return d;
     });
 }
