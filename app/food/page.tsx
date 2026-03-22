@@ -455,8 +455,17 @@ export default function FoodPage() {
   const { foodEntries, savedFoods, favoriteGroups, customCategories, addFood, removeFood, updateFood, saveFoodToHistory, removeSavedFood, updateSavedFoodCategory, addCustomCategory, removeCustomCategory, toggleFavorite, addFavoriteGroup, updateFavoriteGroup, removeFavoriteGroup, hydrate } = useStore();
   const [tab, setTab] = useState<'ai' | 'favorites' | 'history'>('ai');
   const [query, setQuery] = useState('');
-  const [meal, setMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch');
+  function mealFromTime(time: string): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+    const h = parseInt(time.split(':')[0]);
+    if (h >= 5  && h < 10) return 'breakfast';
+    if (h >= 10 && h < 15) return 'lunch';
+    if (h >= 17 && h < 22) return 'dinner';
+    return 'snack';
+  }
   const [eatTime, setEatTime] = useState(() => new Date().toTimeString().slice(0, 5));
+  const [meal, setMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>(
+    () => mealFromTime(new Date().toTimeString().slice(0, 5))
+  );
   const [eatDate, setEatDate] = useState(() => todayStr());
   const [results, setResults] = useState<AIFood[]>([]);
   const [addedFoods, setAddedFoods] = useState<Set<string>>(new Set());
@@ -590,7 +599,7 @@ export default function FoodPage() {
               {MEAL_LABELS[m]}
             </button>
           ))}
-          <input type="time" value={eatTime} onChange={e => setEatTime(e.target.value)}
+          <input type="time" value={eatTime} onChange={e => { setEatTime(e.target.value); setMeal(mealFromTime(e.target.value)); }}
             className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex-shrink-0" />
         </div>
         {/* 日付選択 */}
