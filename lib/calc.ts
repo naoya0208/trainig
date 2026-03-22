@@ -129,9 +129,9 @@ export function calcTargetCalories(p: Profile): {
   const isUnsafe = Math.abs(weeklyChange) > maxWeekly;
   const safe = isUnsafe ? Math.sign(weeklyChange) * maxWeekly : weeklyChange;
   let targetCalories = Math.round(tdee + (safe * 7200) / 7);
-  // 黄体期（月経開始から排卵後〜次の生理まで）はカロリー目標+200kcal（代謝上昇を反映）
-  // 不定期の場合は計算精度が下がるため参考値扱い
-  if (p.gender === 'female' && p.lastPeriodDate && !p.isIrregularCycle) {
+  // 黄体期はカロリー目標+200kcal（代謝上昇を反映）
+  // 不定期の場合は計算精度が下がるが、ユーザーの感覚と合わせるため同様に適用（UI上で推定値と表示）
+  if (p.gender === 'female' && p.lastPeriodDate) {
     const { phase } = getMenstrualPhase(p.lastPeriodDate, p.cycleLength);
     if (phase === 'luteal') targetCalories += 200;
   }

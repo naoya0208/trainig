@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { Profile, ActivityLevel, GoalType, GoalPurpose, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight, getMenstrualPhase } from '@/lib/calc';
-import { MEDICATION_DEFS, MedicationKey } from '@/lib/medications';
+import { CustomMedication } from '@/lib/medications';
 import { localDate } from '@/lib/date';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
@@ -15,7 +15,8 @@ const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
 ];
 
 function ProfileContent() {
-  const { profile, setProfile, hydrate, syncCode, setSyncCode, loadFromCloud, syncToCloud } = useStore();
+  const { profile, setProfile, hydrate, syncCode, setSyncCode, loadFromCloud, syncToCloud,
+          customMedications, addCustomMedication, removeCustomMedication } = useStore();
   const searchParams = useSearchParams();
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [age, setAge] = useState('');
@@ -36,6 +37,11 @@ function ProfileContent() {
   const [isIrregularCycle, setIsIrregularCycle] = useState(false);
   const [cycleLength, setCycleLength] = useState('28');
   const [medications, setMedications] = useState<string[]>([]);
+  // 薬AI検索
+  const [medQuery, setMedQuery] = useState('');
+  const [medLoading, setMedLoading] = useState(false);
+  const [medResult, setMedResult] = useState<CustomMedication | null>(null);
+  const [medError, setMedError] = useState('');
   const [aiAdvice, setAiAdvice] = useState<any>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -108,7 +114,6 @@ function ProfileContent() {
       lastPeriodDate: gender === 'female' && lastPeriodDate ? lastPeriodDate : undefined,
       isIrregularCycle: gender === 'female' ? isIrregularCycle : undefined,
       cycleLength: gender === 'female' && !isIrregularCycle ? parseInt(cycleLength) || 28 : undefined,
-      medications: medications.length > 0 ? medications : undefined,
     };
   })();
 
@@ -130,6 +135,31 @@ function ProfileContent() {
       });
       setAiAdvice(await res.json());
     } finally { setLoadingAdvice(false); }
+  }
+
+  async function handleMedSearch() {
+    if (!medQuery.trim()) return;
+    setMedLoading(true); setMedError(''); setMedResult(null);
+    try {
+      const res = await fetch('/api/gemini/medication', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: medQuery }),
+      });
+      if (res.status === 404) { setMedError('薬が見つかりませんでした。別の名前で試してください。'); return; }
+      const data = await res.json();
+      if (data.error) { setMedError('検索エラーが発生しました。'); return; }
+      setMedResult({
+        id: crypto.randomUUID(),
+        name: data.medication.name,
+        category: data.medication.category,
+        depletedNutrients: data.medication.depletedNutrients ?? [],
+        recommendations: data.medication.recommendations ?? [],
+        avoid: data.medication.avoid,
+        warnings: data.medication.warnings,
+        searchedAt: new Date().toISOString(),
+      });
+    } catch { setMedError('通信エラーが発生しました。'); }
+    finally { setMedLoading(false); }
   }
 
   function handleSave() {
@@ -392,8 +422,8 @@ function ProfileContent() {
           {isIrregularCycle && (
             <div className="bg-pink-50 border border-pink-100 rounded-xl px-3 py-3 mb-3 text-xs text-pink-700 space-y-1">
               <p className="font-semibold">🌸 不定期モード</p>
-              <p>• フェーズ別カロリー自動調整はオフになります</p>
-              <p>• 参考として平均周期日数を入力すると目安表示に使います</p>
+              <p>• フェーズ別カロリー調整（黄体期+200kcal）は引き続き働きます（「推定」と表示）</p>
+              <p>• 平均周期日数を入力すると推定精度が上がります</p>
               <p>• 生理不順はストレス・栄養不足・体重変化が原因のことが多いです</p>
             </div>
           )}
@@ -427,11 +457,11 @@ function ProfileContent() {
             return (
               <div className={`rounded-xl border p-3 ${cls}`}>
                 <p className="font-bold text-sm mb-1">現在：{info.label}（第{info.day}日）</p>
-                {!isIrregularCycle && info.extraCalories > 0 && (
-                <p className="text-xs mb-2">📈 カロリー目標 +{info.extraCalories}kcal（代謝上昇を反映）</p>
-              )}
-              {isIrregularCycle && (
-                <p className="text-xs mb-2 opacity-70">⚠️ 不定期モードのため自動カロリー調整はオフです（参考表示）</p>
+                {info.extraCalories > 0 && (
+                <p className="text-xs mb-2">
+                  📈 カロリー目標 +{info.extraCalories}kcal（代謝上昇を反映）
+                  {isIrregularCycle && <span className="opacity-60 ml-1">推定値</span>}
+                </p>
               )}
               <ul className="space-y-0.5">
                 {info.tips.map((t, i) => <li key={i} className="text-xs opacity-80">• {t}</li>)}
@@ -445,46 +475,101 @@ function ProfileContent() {
         </div>
       )}
 
-      {/* 服薬・薬の情報 */}
+      {/* 服薬・薬の情報（AI検索） */}
       <div className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl">💊</span>
           <div>
             <h2 className="font-bold text-gray-800">服薬情報</h2>
-            <p className="text-xs text-gray-400">薬と栄養の相互作用を考慮した摂取アドバイスを表示</p>
+            <p className="text-xs text-gray-400">AIが薬と栄養の相互作用を検索・登録します</p>
           </div>
         </div>
-        <div className="space-y-2">
-          {MEDICATION_DEFS.map(med => {
-            const isSelected = medications.includes(med.key);
-            return (
-              <button key={med.key}
-                onClick={() => setMedications(prev =>
-                  isSelected ? prev.filter(k => k !== med.key) : [...prev, med.key]
-                )}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition text-left ${
-                  isSelected ? 'bg-orange-50 border-orange-300' : 'border-gray-100 hover:bg-gray-50'
-                }`}>
-                <span className="text-lg flex-shrink-0">{med.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold ${isSelected ? 'text-orange-700' : 'text-gray-700'}`}>{med.label}</p>
-                  <p className="text-xs text-gray-400">{med.category}</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                  isSelected ? 'border-orange-400 bg-orange-400' : 'border-gray-300'
-                }`}>
-                  {isSelected && <span className="text-white text-xs font-bold">✓</span>}
-                </div>
-              </button>
-            );
-          })}
+
+        {/* AI検索フォーム */}
+        <div className="flex gap-2 mb-3">
+          <input
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            placeholder="例: 低用量ピル、クラリチン、メトホルミン、ロキソニン..."
+            value={medQuery}
+            onChange={e => setMedQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleMedSearch()}
+          />
+          <button onClick={handleMedSearch} disabled={medLoading || !medQuery.trim()}
+            className="bg-orange-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 flex-shrink-0">
+            {medLoading ? '⏳' : '🔍 検索'}
+          </button>
         </div>
-        {medications.length > 0 && (
-          <p className="text-xs text-orange-600 bg-orange-50 rounded-xl px-3 py-2 mt-3">
-            💊 {medications.length}種の薬を登録中。ホーム画面で栄養への影響を確認できます。
-          </p>
+
+        {medError && <p className="text-xs text-red-500 mb-3">{medError}</p>}
+
+        {/* 検索結果プレビュー */}
+        {medResult && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-3">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <p className="text-sm font-bold text-orange-700">{medResult.name}</p>
+                <p className="text-xs text-orange-500">{medResult.category}</p>
+              </div>
+              <button onClick={() => setMedResult(null)} className="text-gray-300 hover:text-gray-500">✕</button>
+            </div>
+            {medResult.depletedNutrients.length > 0 && (
+              <div className="mb-2">
+                <p className="text-xs font-semibold text-gray-500 mb-1">消耗が懸念される栄養素</p>
+                <div className="flex flex-wrap gap-1">
+                  {medResult.depletedNutrients.map((n, i) => (
+                    <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                      n.severity === 'high' ? 'bg-red-100 text-red-600' :
+                      n.severity === 'medium' ? 'bg-orange-100 text-orange-600' :
+                      'bg-yellow-100 text-yellow-600'
+                    }`}>{n.label}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <ul className="text-xs text-gray-600 space-y-0.5 mb-3">
+              {medResult.recommendations.slice(0, 3).map((r, i) => <li key={i}>• {r}</li>)}
+            </ul>
+            {medResult.avoid && medResult.avoid.length > 0 && (
+              <ul className="text-xs text-red-500 space-y-0.5 mb-3">
+                {medResult.avoid.map((a, i) => <li key={i}>⚠️ {a}</li>)}
+              </ul>
+            )}
+            <button
+              onClick={() => { addCustomMedication(medResult); setMedResult(null); setMedQuery(''); }}
+              className="w-full bg-orange-500 text-white py-2 rounded-xl text-sm font-bold hover:bg-orange-600">
+              ✓ この薬を登録する
+            </button>
+          </div>
         )}
-        <p className="text-xs text-gray-400 mt-3">※ このアプリの情報は一般的な参考情報です。服薬中の食事管理は必ず医師・薬剤師に相談してください。</p>
+
+        {/* 登録済み薬リスト */}
+        {customMedications.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500">登録中の薬（{customMedications.length}件）</p>
+            {customMedications.map(med => (
+              <div key={med.id} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-700 truncate">{med.name}</p>
+                  <p className="text-xs text-gray-400">{med.category}</p>
+                  {med.depletedNutrients.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {med.depletedNutrients.map((n, i) => (
+                        <span key={i} className="text-xs bg-orange-50 text-orange-600 border border-orange-100 px-1.5 py-0.5 rounded-full">{n.label}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => removeCustomMedication(med.id)}
+                  className="text-gray-300 hover:text-red-400 text-lg flex-shrink-0">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {customMedications.length === 0 && !medResult && (
+          <p className="text-xs text-gray-400 text-center py-2">薬を検索して登録すると、ホーム画面で栄養への影響を確認できます</p>
+        )}
+        <p className="text-xs text-gray-400 mt-3">※ 一般的な参考情報です。服薬中の食事管理は医師・薬剤師にご相談ください。</p>
       </div>
 
       {/* Apple Watch連携 */}

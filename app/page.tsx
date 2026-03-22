@@ -10,7 +10,7 @@ import { localDate } from '@/lib/date';
 function getToday() { return localDate(); }
 
 export default function Home() {
-  const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate, setProfile, waterEntries, addWater } = useStore();
+  const { profile, foodEntries, workoutSessions, savedFoods, saveFoodToHistory, hydrate, setProfile, waterEntries, addWater, customMedications } = useStore();
   const [today, setToday] = useState(getToday);
   const [advice, setAdvice] = useState<{ status: string; message: string; tips: string[] } | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
@@ -67,10 +67,7 @@ export default function Home() {
   const waterTargetMl = Math.round(profile.weight * 30); // 体重×30ml/日
   const menstrualInfo = profile.gender === 'female' && profile.lastPeriodDate
     ? getMenstrualPhase(profile.lastPeriodDate, profile.cycleLength) : null;
-  const activeMedications = (profile.medications ?? [])
-    .map(k => MEDICATION_DEFS.find(d => d.key === k))
-    .filter(Boolean) as typeof MEDICATION_DEFS;
-  const affectedNutrients = getAffectedNutrients(profile.medications ?? []);
+  const affectedNutrients = getAffectedNutrients(profile.medications ?? [], customMedications);
   const consumed = todayFood.reduce((s, e) => s + e.calories, 0);
   const burned = appleWatchActive ? 0 : todayWork.reduce((s, w) => s + w.burnedCalories, 0);
   const MICRO_DEFS = getActiveMicroDefs(profile.goalPurpose, profile.gender);
@@ -208,8 +205,11 @@ export default function Home() {
                 <p className="text-xs text-gray-400 mt-0.5">🌸 不定期モード（参考表示）</p>
               )}
               <p className="text-xs text-gray-500 mt-0.5">{menstrualInfo.tips[0]}</p>
-              {!profile.isIrregularCycle && menstrualInfo.extraCalories > 0 && (
-                <p className={`text-xs font-semibold mt-1 ${phaseConfig.color}`}>📈 目標カロリー +{menstrualInfo.extraCalories}kcal（代謝上昇分）</p>
+              {menstrualInfo.extraCalories > 0 && (
+                <p className={`text-xs font-semibold mt-1 ${phaseConfig.color}`}>
+                  📈 目標カロリー +{menstrualInfo.extraCalories}kcal（代謝上昇分）
+                  {profile.isIrregularCycle && <span className="text-gray-400 font-normal ml-1">推定</span>}
+                </p>
               )}
             </div>
             <Link href="/profile" className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5">設定 →</Link>
@@ -218,23 +218,25 @@ export default function Home() {
       })()}
 
       {/* 服薬バナー */}
-      {activeMedications.length > 0 && (
+      {customMedications.length > 0 && (
         <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-lg">💊</span>
-            <p className="text-sm font-bold text-orange-700">服薬中の栄養管理</p>
+            <p className="text-sm font-bold text-orange-700">服薬中の栄養管理（{customMedications.length}件）</p>
             <Link href="/profile" className="ml-auto text-xs text-orange-400 hover:text-orange-600">編集 →</Link>
           </div>
-          {/* 薬ごとの注意事項（折りたたみ） */}
+          {/* 薬ごとの注意事項 */}
           <div className="space-y-2 mb-3">
-            {activeMedications.map(med => (
-              <div key={med.key} className="bg-white rounded-xl p-3 border border-orange-100">
-                <p className="text-xs font-bold text-orange-600 mb-1">{med.icon} {med.label}</p>
+            {customMedications.map(med => (
+              <div key={med.id} className="bg-white rounded-xl p-3 border border-orange-100">
+                <p className="text-xs font-bold text-orange-600 mb-1">💊 {med.name}
+                  <span className="font-normal text-gray-400 ml-1">({med.category})</span>
+                </p>
                 <ul className="space-y-0.5">
                   {med.recommendations.slice(0, 2).map((r, i) => (
                     <li key={i} className="text-xs text-gray-600">• {r}</li>
                   ))}
-                  {med.avoid && med.avoid.map((a, i) => (
+                  {med.avoid?.slice(0, 1).map((a, i) => (
                     <li key={`a${i}`} className="text-xs text-red-500">⚠️ {a}</li>
                   ))}
                 </ul>
@@ -244,7 +246,7 @@ export default function Home() {
           {/* 影響を受ける栄養素 */}
           {affectedNutrients.size > 0 && (
             <div>
-              <p className="text-xs font-semibold text-orange-600 mb-2">薬による消耗が懸念される栄養素</p>
+              <p className="text-xs font-semibold text-orange-600 mb-2">消耗が懸念される栄養素</p>
               <div className="flex flex-wrap gap-2">
                 {Array.from(affectedNutrients.entries()).map(([key, info]) => (
                   <div key={key} className={`rounded-lg px-2 py-1 text-xs font-semibold border ${

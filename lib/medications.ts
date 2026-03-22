@@ -182,22 +182,44 @@ export const MEDICATION_DEFS: MedicationDef[] = [
   },
 ];
 
-/** ユーザーの服薬リストから影響を受ける栄養素をまとめる */
-export function getAffectedNutrients(medicationKeys: string[]): Map<string, { label: string; severity: 'high' | 'medium' | 'low'; reasons: string[] }> {
+/** AI検索で登録したカスタム薬 */
+export interface CustomMedication {
+  id: string;
+  name: string;
+  category: string;
+  depletedNutrients: DepletedNutrient[];
+  recommendations: string[];
+  avoid?: string[];
+  warnings?: string[];
+  searchedAt: string; // ISO date
+}
+
+/** ユーザーの服薬リストから影響を受ける栄養素をまとめる（ビルトイン＋カスタム両対応）*/
+export function getAffectedNutrients(
+  medicationKeys: string[],
+  customMedications: CustomMedication[] = [],
+): Map<string, { label: string; severity: 'high' | 'medium' | 'low'; reasons: string[] }> {
   const map = new Map<string, { label: string; severity: 'high' | 'medium' | 'low'; reasons: string[] }>();
-  for (const key of medicationKeys) {
-    const def = MEDICATION_DEFS.find(d => d.key === key);
-    if (!def) continue;
-    for (const dn of def.depletedNutrients) {
+
+  function merge(name: string, depleted: DepletedNutrient[]) {
+    for (const dn of depleted) {
       const existing = map.get(dn.key);
       if (existing) {
-        existing.reasons.push(`${def.label}：${dn.reason}`);
+        existing.reasons.push(`${name}：${dn.reason}`);
         if (dn.severity === 'high') existing.severity = 'high';
         else if (dn.severity === 'medium' && existing.severity === 'low') existing.severity = 'medium';
       } else {
-        map.set(dn.key, { label: dn.label, severity: dn.severity, reasons: [`${def.label}：${dn.reason}`] });
+        map.set(dn.key, { label: dn.label, severity: dn.severity, reasons: [`${name}：${dn.reason}`] });
       }
     }
+  }
+
+  for (const key of medicationKeys) {
+    const def = MEDICATION_DEFS.find(d => d.key === key);
+    if (def) merge(def.label, def.depletedNutrients);
+  }
+  for (const med of customMedications) {
+    merge(med.name, med.depletedNutrients);
   }
   return map;
 }
