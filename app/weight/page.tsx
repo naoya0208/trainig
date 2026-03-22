@@ -201,37 +201,49 @@ export default function WeightPage() {
 
           {/* 栄養素バランス（7日平均） */}
           <div className="border-t border-gray-100 pt-3">
-            <div className="flex items-center gap-2 mb-3">
-              <p className="text-xs font-semibold text-gray-400">栄養素バランス（7日平均）</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-xs font-semibold text-gray-500">栄養素バランス（7日平均）</p>
               {isBeautyMode && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
+            </div>
+            {/* 凡例 */}
+            <div className="flex items-center gap-3 mb-3 text-xs text-gray-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />達成</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />不足</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />要注意</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />未記録</span>
             </div>
 
             {/* ① TOP3 バー表示（最重要・常時） */}
             {(() => {
               const TOP3 = [
-                { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', dot: 'bg-orange-400', bar: 'bg-orange-400' },
-                { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  dot: 'bg-blue-400',   bar: 'bg-blue-400'   },
-                { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', dot: 'bg-teal-400',   bar: 'bg-teal-400'   },
+                { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', accent: '#f97316' },
+                { key: 'omega3'   as const, label: 'EPA+DHA',   unit: 'g',  accent: '#3b82f6' },
+                { key: 'zinc'     as const, label: '亜鉛',      unit: 'mg', accent: '#14b8a6' },
               ];
               return (
-                <div className="space-y-2 mb-4">
+                <div className="space-y-3 mb-4">
                   {TOP3.map(item => {
                     const def = MICRO_DEFS.find(d => d.key === item.key);
                     const target = def?.target ?? 0;
                     const v = (avg.micros[item.key] as number) ?? 0;
                     const pct = Math.min(100, Math.round(v / target * 100));
-                    const ok = v >= target * 0.8;
+                    const status = v === 0 ? 'none' : pct >= 80 ? 'ok' : pct >= 20 ? 'low' : 'critical';
+                    const statusLabel = { ok: '✅ 達成', low: '⚠️ 不足', critical: '❌ 要注意', none: '○ 未記録' }[status];
+                    const statusColor = { ok: 'text-emerald-600', low: 'text-amber-500', critical: 'text-red-500', none: 'text-gray-400' }[status];
+                    const barColor = { ok: item.accent, low: '#f59e0b', critical: '#ef4444', none: '#d1d5db' }[status];
                     return (
-                      <div key={item.key}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.dot}`} />
-                          <span className="text-sm text-gray-600 flex-1">{item.label}</span>
-                          <span className={`text-sm font-semibold ${ok ? 'text-gray-700' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>{v}{item.unit}</span>
-                          <span className="text-xs text-gray-400">目標{target}{item.unit}</span>
+                      <div key={item.key} className="bg-gray-50 rounded-xl px-3 py-2.5">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.accent }} />
+                          <span className="text-sm font-semibold text-gray-700 flex-1">{item.label}</span>
+                          <span className={`text-xs font-semibold ${statusColor}`}>{statusLabel}</span>
+                          <span className="text-sm font-bold text-gray-800">{v}<span className="text-xs font-normal text-gray-400 ml-0.5">{item.unit}</span></span>
+                          <span className="text-xs text-gray-400">/ {target}</span>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden ml-5">
-                          <div className={`h-full rounded-full transition-all ${ok ? item.bar : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                        <div className="h-2.5 bg-white rounded-full overflow-hidden border border-gray-200">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
                         </div>
+                        <p className="text-right text-xs text-gray-400 mt-0.5">{pct}%</p>
                       </div>
                     );
                   })}
@@ -241,25 +253,30 @@ export default function WeightPage() {
 
             {/* ② 高優先度美容4種（2列大カード・美容モード常時） */}
             {isBeautyMode && (
-              <div className="bg-pink-50/60 border border-pink-100 rounded-xl p-3 mb-3">
-                <p className="text-xs font-semibold text-pink-400 mb-2">✨ 美容キー栄養素</p>
+              <div className="bg-gradient-to-br from-pink-50 to-purple-50 border border-pink-200 rounded-xl p-3 mb-3">
+                <p className="text-xs font-semibold text-pink-500 mb-2">✨ 美容キー栄養素</p>
                 <div className="grid grid-cols-2 gap-2">
                   {MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'high').map(d => {
                     const v = (avg.micros[d.key] as number) ?? 0;
                     const pct = Math.min(100, Math.round(v / d.target * 100));
-                    const ok = v >= d.target * 0.8;
+                    const status = v === 0 ? 'none' : pct >= 80 ? 'ok' : pct >= 20 ? 'low' : 'critical';
+                    const cardBg = { ok: 'bg-emerald-50 border-emerald-200', low: 'bg-amber-50 border-amber-200', critical: 'bg-red-50 border-red-200', none: 'bg-white border-gray-100' }[status];
+                    const valColor = { ok: 'text-emerald-600', low: 'text-amber-500', critical: 'text-red-500', none: 'text-gray-300' }[status];
+                    const barColor = { ok: 'bg-emerald-400', low: 'bg-amber-400', critical: 'bg-red-400', none: 'bg-gray-200' }[status];
+                    const statusIcon = { ok: '✅', low: '⚠️', critical: '❌', none: '○' }[status];
                     return (
-                      <div key={d.key} className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
+                      <div key={d.key} className={`rounded-xl border px-3 py-2.5 ${cardBg}`}>
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-semibold text-gray-500">{d.label}</p>
-                          <p className={`text-base font-bold ${ok ? 'text-pink-500' : v > 0 ? 'text-orange-400' : 'text-gray-300'}`}>
-                            {v}<span className="text-xs font-normal ml-0.5">{d.unit}</span>
-                          </p>
+                          <p className="text-xs font-semibold text-gray-600">{d.label}</p>
+                          <span className="text-xs">{statusIcon}</span>
                         </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${ok ? 'bg-pink-400' : v > 0 ? 'bg-orange-300' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                        <p className={`text-lg font-bold ${valColor}`}>
+                          {v}<span className="text-xs font-normal ml-0.5 text-gray-400">{d.unit}</span>
+                        </p>
+                        <div className="h-1.5 bg-white/70 rounded-full overflow-hidden mt-1.5">
+                          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
                         </div>
-                        <p className="text-xs text-gray-300 mt-1">目標 {d.target}{d.unit} / {pct}%</p>
+                        <p className="text-xs text-gray-400 mt-1">目標 {d.target}{d.unit}　<span className={`font-semibold ${valColor}`}>{pct}%</span></p>
                       </div>
                     );
                   })}
@@ -276,18 +293,34 @@ export default function WeightPage() {
                   {baseDefs.map(d => {
                     const v = (avg.micros[d.key] as number) ?? 0;
                     const pct = Math.min(100, Math.round(v / d.target * 100));
-                    const ok = d.isLimit ? v <= d.target : v >= d.target * 0.8;
-                    const color = d.isLimit
-                      ? (v > d.target ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600')
-                      : (ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400');
+                    const status = d.isLimit
+                      ? (v > d.target ? 'over' : 'ok')
+                      : (v === 0 ? 'none' : pct >= 80 ? 'ok' : pct >= 20 ? 'low' : 'critical');
+                    const cardBg = {
+                      ok:       'bg-emerald-50  border-emerald-200',
+                      low:      'bg-amber-50    border-amber-200',
+                      critical: 'bg-red-50      border-red-200',
+                      none:     'bg-gray-50     border-gray-200',
+                      over:     'bg-red-50      border-red-300',
+                    }[status];
+                    const valColor = {
+                      ok: 'text-emerald-700', low: 'text-amber-600', critical: 'text-red-500', none: 'text-gray-400', over: 'text-red-600',
+                    }[status];
+                    const barColor = {
+                      ok: 'bg-emerald-400', low: 'bg-amber-400', critical: 'bg-red-400', none: 'bg-gray-200', over: 'bg-red-500',
+                    }[status];
+                    const statusIcon = { ok: '✅', low: '⚠️', critical: '❌', none: '○', over: '🔴' }[status];
                     return (
-                      <div key={d.key} className={`rounded-xl border px-2 py-2 ${color}`}>
-                        <p className="text-xs font-semibold truncate">{d.label}</p>
-                        <p className="text-sm font-bold mt-0.5">{v}<span className="text-xs font-normal ml-0.5">{d.unit}</span></p>
-                        <div className="h-1 bg-white/60 rounded-full mt-1.5 overflow-hidden">
-                          <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                      <div key={d.key} className={`rounded-xl border px-2 py-2 ${cardBg}`}>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <p className="text-xs font-semibold text-gray-600 truncate flex-1 mr-1">{d.label}</p>
+                          <span className="text-xs flex-shrink-0">{statusIcon}</span>
                         </div>
-                        <p className="text-xs opacity-50 mt-0.5">{d.isLimit ? '上限' : '目標'}{d.target}{d.unit}</p>
+                        <p className={`text-sm font-bold ${valColor}`}>{v}<span className="text-xs font-normal ml-0.5 text-gray-400">{d.unit}</span></p>
+                        <div className="h-1 bg-white/60 rounded-full mt-1.5 overflow-hidden">
+                          <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">{d.isLimit ? '上限' : '目標'}{d.target} <span className={`font-semibold ${valColor}`}>{pct}%</span></p>
                       </div>
                     );
                   })}
@@ -295,7 +328,7 @@ export default function WeightPage() {
               );
             })()}
 
-            {/* ④ 低優先度美容（3列コンパクト・折りたたみ） */}
+            {/* ④ 低優先度美容（4列コンパクト・折りたたみ） */}
             {isBeautyMode && (() => {
               const lowDefs = MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'low');
               return (
@@ -309,14 +342,16 @@ export default function WeightPage() {
                       {lowDefs.map(d => {
                         const v = (avg.micros[d.key] as number) ?? 0;
                         const pct = Math.min(100, Math.round(v / d.target * 100));
-                        const ok = v >= d.target * 0.8;
-                        const color = ok ? 'bg-green-50 border-green-100 text-green-700' : v > 0 ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400';
+                        const status = v === 0 ? 'none' : pct >= 80 ? 'ok' : pct >= 20 ? 'low' : 'critical';
+                        const cardBg = { ok: 'bg-emerald-50 border-emerald-200', low: 'bg-amber-50 border-amber-200', critical: 'bg-red-50 border-red-200', none: 'bg-gray-50 border-gray-200' }[status];
+                        const valColor = { ok: 'text-emerald-600', low: 'text-amber-500', critical: 'text-red-500', none: 'text-gray-400' }[status];
+                        const barColor = { ok: 'bg-emerald-400', low: 'bg-amber-400', critical: 'bg-red-400', none: 'bg-gray-200' }[status];
                         return (
-                          <div key={d.key} className={`rounded-lg border px-1.5 py-1.5 ${color}`}>
-                            <p className="text-xs font-semibold truncate leading-tight">{d.label}</p>
-                            <p className="text-xs font-bold mt-0.5">{v}<span className="text-xs font-normal">{d.unit}</span></p>
+                          <div key={d.key} className={`rounded-lg border px-1.5 py-1.5 ${cardBg}`}>
+                            <p className="text-xs font-semibold truncate leading-tight text-gray-600">{d.label}</p>
+                            <p className={`text-xs font-bold mt-0.5 ${valColor}`}>{v}<span className="font-normal text-gray-400">{d.unit}</span></p>
                             <div className="h-0.5 bg-white/60 rounded-full mt-1 overflow-hidden">
-                              <div className={`h-full rounded-full ${ok ? 'bg-green-400' : v > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} style={{ width: `${pct}%` }} />
+                              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                             </div>
                           </div>
                         );
