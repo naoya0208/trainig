@@ -1,6 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { MICRO_DEFS } from '@/lib/micros';
+import { useStore } from '@/lib/store';
+import { localDate } from '@/lib/date';
+import type { Profile } from '@/lib/calc';
 
 const QUICK_CONDITIONS = ['低コスト', '残り物活用', '時短（15分以内）', '簡単', '作り置き'];
 const BASE_NUTRIENTS = ['タンパク質', '脂質', '炭水化物', ...MICRO_DEFS.map((d) => d.label)];
@@ -14,6 +17,21 @@ const GOALS = [
   { id: 'immune',  label: '免疫強化',          icon: '🛡️', desc: 'ビタミンC・亜鉛' },
 ] as const;
 type GoalId = typeof GOALS[number]['id'];
+
+const MEAL_OPTIONS = [
+  { id: 'breakfast', label: '朝食' },
+  { id: 'lunch',     label: '昼食' },
+  { id: 'dinner',    label: '夕食' },
+  { id: 'snack',     label: '間食' },
+] as const;
+
+function profileToGoal(profile: Profile | null): GoalId | null {
+  if (!profile) return null;
+  if (profile.goalPurpose === 'beauty') return 'beauty';
+  if (profile.goalPurpose === 'muscle' || profile.goalType === 'gain') return 'muscle';
+  if (profile.goalType === 'lose') return 'diet';
+  return 'health';
+}
 
 const DEFAULT_CATEGORIES = ['朝食', '昼食', '夕食', '作り置き', 'おやつ', 'その他'];
 const STORAGE_NUTRIENTS  = 'recipe_custom_nutrients';
@@ -163,10 +181,18 @@ function DetailContent({ detail }: { detail: DishDetail }) {
 }
 
 export default function RecipePage() {
+  const { profile, addFood, saveFoodToHistory, hydrate } = useStore();
   const [tab, setTab] = useState<'propose' | 'saved'>('propose');
 
   // 目的・栄養素
   const [goal, setGoal] = useState<GoalId | null>(null);
+  const [goalOverridden, setGoalOverridden] = useState(false);
+  const [showGoalOverride, setShowGoalOverride] = useState(false);
+
+  // 食事登録モーダル
+  const [addToMealRecipe, setAddToMealRecipe] = useState<SavedRecipe | null>(null);
+  const [selectedMeal, setSelectedMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('dinner');
+  const [addToMealDone, setAddToMealDone] = useState(false);
   const [customNutrients, setCustomNutrients] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [newNutrient, setNewNutrient] = useState('');
@@ -206,6 +232,7 @@ export default function RecipePage() {
   const [editingCat, setEditingCat] = useState<{ index: number; value: string } | null>(null);
 
   useEffect(() => {
+    hydrate();
     const n = localStorage.getItem(STORAGE_NUTRIENTS);
     if (n) setCustomNutrients(JSON.parse(n));
     const s = localStorage.getItem(STORAGE_SAVED);
@@ -213,6 +240,13 @@ export default function RecipePage() {
     const c = localStorage.getItem(STORAGE_CATEGORIES);
     setAllCategories(c ? JSON.parse(c) : DEFAULT_CATEGORIES);
   }, []);
+
+  // プロフィールから目的を自動設定
+  useEffect(() => {
+    if (!goalOverridden) {
+      setGoal(profileToGoal(profile));
+    }
+  }, [profile, goalOverridden]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -367,6 +401,67 @@ export default function RecipePage() {
     if ('id' in (detailDish ?? {}) && (detailDish as SavedRecipe)?.id === id) setDetailDish(null);
   }
 
+  // --- 食事に追加 ---
+  function addRecipeToMeal() {
+    if (!addToMealRecipe) return;
+    const recipe = addToMealRecipe;
+    const n = recipe.nutrition;
+    const today = localDate();
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const grams = 300;
+
+    addFood({
+      id,
+      date: today,
+      meal: selectedMeal,
+      foodName: recipe.name,
+      grams,
+      calories: n?.calories ?? 0,
+      protein: n?.protein ?? 0,
+      fat: n?.fat ?? 0,
+      carbs: n?.carbs ?? 0,
+      micros: recipe.detail?.micros
+        ? {
+            fiber: recipe.detail.micros.fiber,
+            vitaminC: recipe.detail.micros.vitaminC,
+            vitaminD: recipe.detail.micros.vitaminD,
+            vitaminB12: recipe.detail.micros.vitaminB12,
+            vitaminE: recipe.detail.micros.vitaminE,
+            vitaminA: recipe.detail.micros.vitaminA,
+            vitaminB6: recipe.detail.micros.vitaminB6,
+            iron: recipe.detail.micros.iron,
+            calcium: recipe.detail.micros.calcium,
+            zinc: recipe.detail.micros.zinc,
+            magnesium: recipe.detail.micros.magnesium,
+            folate: recipe.detail.micros.folate,
+            omega3: recipe.detail.micros.omega3,
+          }
+        : undefined,
+    });
+
+    if (n) {
+      const per100g = {
+        calories: Math.round((n.calories / grams) * 100),
+        protein:  Math.round((n.protein  / grams) * 100 * 10) / 10,
+        fat:      Math.round((n.fat      / grams) * 100 * 10) / 10,
+        carbs:    Math.round((n.carbs    / grams) * 100 * 10) / 10,
+      };
+      saveFoodToHistory({
+        id,
+        foodName: recipe.name,
+        grams,
+        per100g,
+        isFavorite: false,
+        lastUsed: today,
+        useCount: 1,
+        category: recipe.categories[0] ?? 'その他',
+      });
+    }
+
+    setAddToMealDone(true);
+    setTimeout(() => { setAddToMealRecipe(null); setAddToMealDone(false); }, 1200);
+  }
+
   // --- カテゴリ管理 ---
   function startEditCat(index: number) { setEditingCat({ index, value: allCategories[index] }); }
   function commitEditCat() {
@@ -431,19 +526,44 @@ export default function RecipePage() {
       {/* ===== 提案タブ ===== */}
       {tab === 'propose' && (
         <>
-          {/* 目的 */}
+          {/* 目的（プロフィールから自動設定） */}
           <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-700">① 目的を選ぶ（任意）</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {GOALS.map((g) => (
-                <button key={g.id} onClick={() => setGoal(goal === g.id ? null : g.id)}
-                  className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-left transition-all
-                    ${goal === g.id ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                  <span className="text-base">{g.icon} <span className="text-sm font-medium">{g.label}</span></span>
-                  <span className="text-xs text-gray-400 mt-0.5">{g.desc}</span>
-                </button>
-              ))}
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-700">① 目的</h2>
+              <button onClick={() => setShowGoalOverride(!showGoalOverride)}
+                className="text-xs text-blue-500 hover:text-blue-600">
+                {showGoalOverride ? '▲ 閉じる' : '✏️ 変更する'}
+              </button>
             </div>
+            {goal ? (
+              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${showGoalOverride ? 'border-gray-200 bg-gray-50' : 'border-orange-300 bg-orange-50'}`}>
+                <span className="text-xl">{GOALS.find((g) => g.id === goal)?.icon}</span>
+                <div>
+                  <div className="text-sm font-medium text-gray-800">{GOALS.find((g) => g.id === goal)?.label}</div>
+                  <div className="text-xs text-gray-400">{goalOverridden ? '手動設定' : '設定タブから自動設定'}</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">設定タブで目標を設定すると自動で反映されます</p>
+            )}
+            {showGoalOverride && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                {GOALS.map((g) => (
+                  <button key={g.id} onClick={() => { setGoal(g.id); setGoalOverridden(true); setShowGoalOverride(false); }}
+                    className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-left transition-all
+                      ${goal === g.id ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                    <span className="text-base">{g.icon} <span className="text-sm font-medium">{g.label}</span></span>
+                    <span className="text-xs text-gray-400 mt-0.5">{g.desc}</span>
+                  </button>
+                ))}
+                {goalOverridden && (
+                  <button onClick={() => { setGoalOverridden(false); setGoal(profileToGoal(profile)); setShowGoalOverride(false); }}
+                    className="col-span-full text-xs text-blue-500 hover:text-blue-600 text-center py-1">
+                    設定タブの目標に戻す
+                  </button>
+                )}
+              </div>
+            )}
           </section>
 
           {/* 栄養素 */}
@@ -634,10 +754,16 @@ export default function RecipePage() {
                       <span key={n} className="px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded-full">{n}</span>
                     ))}
                   </div>
-                  <button onClick={() => openDetail(recipe)}
-                    className="w-full py-1.5 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
-                    📖 詳細・URL を見る
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => openDetail(recipe)}
+                      className="flex-1 py-1.5 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
+                      📖 詳細・URL
+                    </button>
+                    <button onClick={() => { setAddToMealRecipe(recipe); setAddToMealDone(false); setSelectedMeal('dinner'); }}
+                      className="flex-1 py-1.5 text-sm border border-green-200 rounded-xl text-green-600 hover:bg-green-50 transition-colors">
+                      🍽️ 食事に追加
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -707,6 +833,43 @@ export default function RecipePage() {
               <button onClick={saveRecipe} disabled={saveCategories.length === 0}
                 className="w-full py-3 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-600 disabled:opacity-40 transition-colors">
                 保存する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 食事に追加モーダル ===== */}
+      {addToMealRecipe && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setAddToMealRecipe(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-gray-800">🍽️ 食事に追加</h2>
+              <button onClick={() => setAddToMealRecipe(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">「{addToMealRecipe.name}」を今日の食事に追加します</p>
+              {addToMealRecipe.nutrition && (
+                <NutritionBar n={addToMealRecipe.nutrition} />
+              )}
+              {!addToMealRecipe.nutrition && (
+                <p className="text-xs text-yellow-600 bg-yellow-50 px-3 py-2 rounded-xl">※ 栄養情報がないため0で登録されます。詳細を取得してから追加すると正確になります。</p>
+              )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">食事タイミングを選ぶ</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {MEAL_OPTIONS.map((m) => (
+                    <button key={m.id} onClick={() => setSelectedMeal(m.id)}
+                      className={`py-2.5 text-sm rounded-xl border font-medium transition-all
+                        ${selectedMeal === m.id ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={addRecipeToMeal} disabled={addToMealDone}
+                className={`w-full py-3 font-semibold rounded-xl transition-colors ${addToMealDone ? 'bg-green-500 text-white' : 'bg-green-500 text-white hover:bg-green-600'}`}>
+                {addToMealDone ? '✓ 追加しました！' : `${MEAL_OPTIONS.find((m) => m.id === selectedMeal)?.label}に追加する`}
               </button>
             </div>
           </div>
