@@ -4,6 +4,16 @@ import { MICRO_DEFS } from '@/lib/micros';
 
 const QUICK_CONDITIONS = ['低コスト', '残り物活用', '時短（15分以内）', '簡単', '作り置き'];
 const BASE_NUTRIENTS = ['タンパク質', '脂質', '炭水化物', ...MICRO_DEFS.map((d) => d.label)];
+
+const GOALS = [
+  { id: 'diet',    label: '減量・ダイエット', icon: '🔥', desc: '低カロリー・高満足感' },
+  { id: 'muscle',  label: '筋肉増量',          icon: '💪', desc: '高タンパク・栄養密度重視' },
+  { id: 'beauty',  label: '美容・肌ケア',      icon: '✨', desc: 'コラーゲン・抗酸化栄養素' },
+  { id: 'health',  label: '健康維持',          icon: '🌿', desc: 'バランス重視' },
+  { id: 'fatigue', label: '疲労回復',          icon: '⚡', desc: 'ビタミンB群・鉄分' },
+  { id: 'immune',  label: '免疫強化',          icon: '🛡️', desc: 'ビタミンC・亜鉛' },
+] as const;
+type GoalId = typeof GOALS[number]['id'];
 const DEFAULT_CATEGORIES = ['朝食', '昼食', '夕食', '作り置き', 'おやつ', 'その他'];
 
 const STORAGE_NUTRIENTS = 'recipe_custom_nutrients';
@@ -40,6 +50,9 @@ interface Message {
 
 export default function RecipePage() {
   const [tab, setTab] = useState<'propose' | 'saved'>('propose');
+
+  // 目的
+  const [goal, setGoal] = useState<GoalId | null>(null);
 
   // 栄養素
   const [customNutrients, setCustomNutrients] = useState<string[]>([]);
@@ -130,12 +143,13 @@ export default function RecipePage() {
       const res = await fetch('/api/gemini/recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nutrients: selected, condition }),
+        body: JSON.stringify({ nutrients: selected, condition, goal }),
       });
       const data = await res.json();
       setDishes(data.dishes ?? []);
       setAiMessage(data.message ?? '');
-      setMessages([{ role: 'assistant', content: `${selected.join('・')}を補える料理を提案しました！${condition ? `（条件: ${condition}）` : ''}\n気になる料理や、他の条件があればチャットで教えてください。` }]);
+      const goalLabel = GOALS.find((g) => g.id === goal)?.label;
+      setMessages([{ role: 'assistant', content: `${goalLabel ? `【${goalLabel}】` : ''}${selected.join('・')}を補える料理を提案しました！${condition ? `（条件: ${condition}）` : ''}\n気になる料理や、他の条件があればチャットで教えてください。` }]);
     } catch {
       setAiMessage('エラーが発生しました。もう一度お試しください。');
     } finally {
@@ -279,9 +293,24 @@ export default function RecipePage() {
       {/* ===== 提案タブ ===== */}
       {tab === 'propose' && (
         <>
+          {/* 目的選択 */}
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <h2 className="font-semibold text-gray-700">① 目的を選ぶ（任意）</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {GOALS.map((g) => (
+                <button key={g.id} onClick={() => setGoal(goal === g.id ? null : g.id)}
+                  className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-left transition-all
+                    ${goal === g.id ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                  <span className="text-base">{g.icon} <span className="text-sm font-medium">{g.label}</span></span>
+                  <span className="text-xs text-gray-400 mt-0.5">{g.desc}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
           {/* 栄養素選択 */}
           <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-700">① 不足している栄養素を選ぶ</h2>
+            <h2 className="font-semibold text-gray-700">② 不足している栄養素を選ぶ</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {allNutrients.map((label) => {
                 const isCustom = customNutrients.includes(label);
@@ -319,7 +348,7 @@ export default function RecipePage() {
 
           {/* 絞り込み条件 */}
           <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-700">② 絞り込み条件（任意）</h2>
+            <h2 className="font-semibold text-gray-700">③ 絞り込み条件（任意）</h2>
             <input value={condition} onChange={(e) => setCondition(e.target.value)}
               placeholder="例: 低コストで、残り物で、10分以内..."
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300" />

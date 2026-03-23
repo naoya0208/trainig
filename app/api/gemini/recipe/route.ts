@@ -5,7 +5,17 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { action, nutrients, condition, messages, dishName } = body;
+  const { action, nutrients, condition, goal, messages, dishName } = body;
+
+  const GOAL_INSTRUCTIONS: Record<string, string> = {
+    diet:    '【最優先】減量・ダイエット目的。低カロリー・低脂質・高たんぱくで腹持ちの良い料理を優先してください。揚げ物や高糖質な料理は避けてください。',
+    muscle:  '【最優先】筋肉増量目的。高タンパク（1品で20g以上が理想）で栄養密度が高い料理を優先してください。食後の筋合成を意識した食材を使ってください。',
+    beauty:  '【最優先】美容・肌ケア目的。コラーゲン生成を助けるビタミンC・鉄分、抗酸化作用のある食材、腸活に良い食物繊維を含む料理を優先してください。',
+    health:  '【最優先】健康維持目的。栄養バランスが良く、野菜・発酵食品・良質な脂質を含む料理を優先してください。',
+    fatigue: '【最優先】疲労回復目的。ビタミンB群・鉄分・クエン酸を豊富に含む食材を使い、エネルギー代謝を高める料理を優先してください。',
+    immune:  '【最優先】免疫強化目的。ビタミンC・亜鉛・β-グルカン・発酵食品など免疫機能をサポートする食材を含む料理を優先してください。',
+  };
+  const goalInstruction = goal ? GOAL_INSTRUCTIONS[goal] ?? '' : '';
 
   // 料理の詳細取得
   if (action === 'detail') {
@@ -49,14 +59,14 @@ export async function POST(req: NextRequest) {
   }
 
   // 初回の料理提案
-  const nutrientList = nutrients.join('、');
+  const nutrientList = nutrients.length > 0 ? nutrients.join('、') : '特に指定なし';
   const conditionText = condition ? `\n絞り込み条件: ${condition}` : '';
   const prompt = `あなたは管理栄養士兼料理研究家のAIです。
 不足している栄養素を補える料理を提案してください。
-
+${goalInstruction ? `\n${goalInstruction}\n` : ''}
 不足している栄養素: ${nutrientList}${conditionText}
 
-以下のJSON形式で3〜5品提案してください:
+以下のJSON形式で3〜5品提案してください。目的がある場合はその目的に最も合った料理を先頭に並べてください:
 {
   "dishes": [
     {
