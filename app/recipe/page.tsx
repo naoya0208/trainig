@@ -31,12 +31,64 @@ interface Dish {
   nutrition?: Nutrition;
 }
 
+interface Micros {
+  fiber?: number; vitaminC?: number; vitaminD?: number; vitaminB12?: number;
+  vitaminE?: number; vitaminA?: number; vitaminB6?: number; iron?: number;
+  calcium?: number; zinc?: number; magnesium?: number; folate?: number; omega3?: number;
+}
+
 interface DishDetail {
   ingredients: string[];
   steps: string[];
   tips: string;
   servings: string;
   searchUrl: string;
+  micros?: Micros;
+}
+
+const MICRO_DISPLAY: { key: keyof Micros; label: string; unit: string; daily: number }[] = [
+  { key: 'vitaminC',   label: 'ビタミンC',   unit: 'mg', daily: 100  },
+  { key: 'vitaminD',   label: 'ビタミンD',   unit: 'μg', daily: 8.5  },
+  { key: 'vitaminE',   label: 'ビタミンE',   unit: 'mg', daily: 6.0  },
+  { key: 'vitaminA',   label: 'ビタミンA',   unit: 'μg', daily: 700  },
+  { key: 'vitaminB6',  label: 'ビタミンB6',  unit: 'mg', daily: 1.2  },
+  { key: 'vitaminB12', label: 'ビタミンB12', unit: 'μg', daily: 2.4  },
+  { key: 'iron',       label: '鉄分',        unit: 'mg', daily: 7.5  },
+  { key: 'calcium',    label: 'カルシウム',  unit: 'mg', daily: 650  },
+  { key: 'zinc',       label: '亜鉛',        unit: 'mg', daily: 10   },
+  { key: 'magnesium',  label: 'マグネシウム', unit: 'mg', daily: 270  },
+  { key: 'folate',     label: '葉酸',        unit: 'μg', daily: 240  },
+  { key: 'fiber',      label: '食物繊維',    unit: 'g',  daily: 22   },
+  { key: 'omega3',     label: 'EPA+DHA',     unit: 'g',  daily: 2.0  },
+];
+
+function MicrosDisplay({ micros }: { micros: Micros }) {
+  const items = MICRO_DISPLAY
+    .map((d) => ({ ...d, value: micros[d.key] ?? 0 }))
+    .filter((d) => d.value > 0);
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-gray-700 mb-2">🔬 微量栄養素（1人前・日推奨量比）</h3>
+      <div className="space-y-2">
+        {items.map((d) => {
+          const pct = Math.min(Math.round((d.value / d.daily) * 100), 100);
+          const barColor = pct >= 50 ? 'bg-green-400' : pct >= 25 ? 'bg-yellow-400' : 'bg-blue-300';
+          return (
+            <div key={d.key}>
+              <div className="flex justify-between text-xs text-gray-600 mb-0.5">
+                <span>{d.label}</span>
+                <span>{d.value}{d.unit} <span className="text-gray-400">({pct}%)</span></span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 interface SavedRecipe extends Dish {
@@ -77,6 +129,7 @@ function NutritionBar({ n }: { n: Nutrition }) {
 function DetailContent({ detail }: { detail: DishDetail }) {
   return (
     <>
+      {detail.micros && <MicrosDisplay micros={detail.micros} />}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-2">🧾 材料 ({detail.servings})</h3>
         <ul className="space-y-1">

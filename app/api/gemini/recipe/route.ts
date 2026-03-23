@@ -19,14 +19,30 @@ export async function POST(req: NextRequest) {
 
   // 料理の詳細取得
   if (action === 'detail') {
-    const prompt = `「${dishName}」の詳細なレシピを教えてください。
+    const prompt = `「${dishName}」の詳細なレシピと栄養情報を教えてください。
 以下のJSON形式で回答してください:
 {
   "ingredients": ["材料1（量）", "材料2（量）"],
   "steps": ["手順1", "手順2", "手順3"],
   "tips": "コツやポイント（1〜2文）",
-  "servings": "何人分か"
-}`;
+  "servings": "何人分か",
+  "micros": {
+    "fiber": 食物繊維g数値,
+    "vitaminC": ビタミンCmg数値,
+    "vitaminD": ビタミンDμg数値,
+    "vitaminB12": ビタミンB12μg数値,
+    "vitaminE": ビタミンEmg数値,
+    "vitaminA": ビタミンAμg数値,
+    "vitaminB6": ビタミンB6mg数値,
+    "iron": 鉄分mg数値,
+    "calcium": カルシウムmg数値,
+    "zinc": 亜鉛mg数値,
+    "magnesium": マグネシウムmg数値,
+    "folate": 葉酸μg数値,
+    "omega3": EPA+DHAg数値
+  }
+}
+micros は1人前の概算値を数値で入れてください。不明な場合は0としてください。`;
     try {
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const result = await model.generateContent(prompt);
