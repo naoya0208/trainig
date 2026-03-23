@@ -4,26 +4,53 @@ import { NextRequest, NextResponse } from 'next/server';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: NextRequest) {
-  const { nutrients, condition, messages } = await req.json();
+  const body = await req.json();
+  const { action, nutrients, condition, messages, dishName } = body;
 
-  // チャット継続の場合
+  // 料理の詳細取得
+  if (action === 'detail') {
+    const prompt = `「${dishName}」の詳細なレシピを教えてください。
+以下のJSON形式で回答してください:
+{
+  "ingredients": ["材料1（量）", "材料2（量）"],
+  "steps": ["手順1", "手順2", "手順3"],
+  "tips": "コツやポイント（1〜2文）",
+  "servings": "何人分か"
+}`;
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
+      const detail = JSON.parse(jsonMatch[0]);
+      detail.searchUrl = `https://cookpad.com/search/${encodeURIComponent(dishName)}`;
+      return NextResponse.json(detail);
+    } catch (e: any) {
+      return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
+    }
+  }
+
+  // チャット継続
   if (messages && messages.length > 0) {
     const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
       role: m.role === 'user' ? 'user' : 'model',
       parts: [{ text: m.content }],
     }));
     const lastMessage = messages[messages.length - 1].content;
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const chat = model.startChat({ history });
-    const result = await chat.sendMessage(lastMessage);
-    return NextResponse.json({ reply: result.response.text() });
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const chat = model.startChat({ history });
+      const result = await chat.sendMessage(lastMessage);
+      return NextResponse.json({ reply: result.response.text() });
+    } catch (e: any) {
+      return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
+    }
   }
 
   // 初回の料理提案
   const nutrientList = nutrients.join('、');
   const conditionText = condition ? `\n絞り込み条件: ${condition}` : '';
-
   const prompt = `あなたは管理栄養士兼料理研究家のAIです。
 不足している栄養素を補える料理を提案してください。
 
@@ -51,7 +78,6 @@ export async function POST(req: NextRequest) {
     if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
     return NextResponse.json(JSON.parse(jsonMatch[0]));
   } catch (e: any) {
-    console.error(e);
     return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
   }
 }
