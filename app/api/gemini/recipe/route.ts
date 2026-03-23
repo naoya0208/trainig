@@ -74,11 +74,13 @@ ${goalInstruction ? `\n${goalInstruction}\n` : ''}
       "description": "一言説明（食材・味など）",
       "nutrients": ["この料理で補える主な栄養素"],
       "time": "調理時間の目安",
-      "cost": "コスト感（低/中/高）"
+      "cost": "コスト感（低/中/高）",
+      "nutrition": { "calories": 概算カロリー数値, "protein": タンパク質g数値, "fat": 脂質g数値, "carbs": 炭水化物g数値 }
     }
   ],
   "message": "提案の一言コメント"
-}`;
+}
+nutritionは1人前の概算値を数値で入れてください。`;
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
