@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MICRO_DEFS } from '@/lib/micros';
 
 const QUICK_CONDITIONS = ['低コスト', '残り物活用', '時短（15分以内）', '簡単', '作り置き'];
-const BASE_NUTRIENTS = MICRO_DEFS.map((d) => d.label);
+const BASE_NUTRIENTS = ['タンパク質', '脂質', '炭水化物', ...MICRO_DEFS.map((d) => d.label)];
 const DEFAULT_CATEGORIES = ['朝食', '昼食', '夕食', '作り置き', 'おやつ', 'その他'];
 
 const STORAGE_NUTRIENTS = 'recipe_custom_nutrients';
