@@ -633,13 +633,7 @@ export default function FoodPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold">食事記録</h1>
-        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold ${remaining <= 5 ? 'bg-red-100 text-red-500' : remaining <= 10 ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
-          <span>🤖</span>
-          <span>AI残り {remaining} 回</span>
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold mb-2">食事記録</h1>
       <div className="bg-white rounded-2xl px-5 py-3 mb-4 shadow-sm flex justify-between items-center">
         <span className="text-sm text-gray-400">合計</span>
         <span className="text-xl font-bold">{totalCal.toLocaleString()} kcal</span>
@@ -713,6 +707,11 @@ export default function FoodPage() {
               className={`text-white px-5 py-3 rounded-xl text-sm font-semibold disabled:opacity-50 transition ${searchMode === 'supplement' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
               {loading ? '...' : '検索'}
             </button>
+          </div>
+          <div className="flex justify-end mt-1.5">
+            <span className={`text-sm font-semibold px-2.5 py-1 rounded-lg ${remaining <= 5 ? 'bg-red-100 text-red-500' : remaining <= 10 ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
+              残り {remaining} 回 / 日
+            </span>
           </div>
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {results.length > 0 && (
