@@ -520,16 +520,16 @@ export default function FoodPage() {
     hydrate();
   }, []);
 
-  // デフォルトカテゴリをストアに移行（初回のみ）
+  // デフォルトカテゴリをストアに移行（v2: 既存フラグを無視して再実行）
   useEffect(() => {
-    const migrated = localStorage.getItem('food_cats_migrated');
+    const migrated = localStorage.getItem('food_cats_migrated_v2');
     if (!migrated) {
       const stored = localStorage.getItem('ct_custom_cats');
       const existing: string[] = stored ? JSON.parse(stored) : [];
       FOOD_CATEGORIES.forEach(c => {
         if (!existing.includes(c)) addCustomCategory(c);
       });
-      localStorage.setItem('food_cats_migrated', '1');
+      localStorage.setItem('food_cats_migrated_v2', '1');
     }
   }, []);
 
