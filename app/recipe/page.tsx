@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { localDate } from '@/lib/date';
 import type { Profile } from '@/lib/calc';
 import InventoryTab, { InventoryItem } from './InventoryTab';
-import { getRemainingCount, incrementUsage, getUserApiKey } from '@/lib/apiCounter';
+import { fetchRemaining, incrementUsage, getUserApiKey } from '@/lib/apiCounter';
 
 const QUICK_CONDITIONS = ['低コスト', '残り物活用', '時短（15分以内）', '簡単', '作り置き'];
 const BASE_NUTRIENTS = ['タンパク質', '脂質', '炭水化物', ...MICRO_DEFS.map((d) => d.label)];
@@ -219,7 +219,7 @@ export default function RecipePage() {
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<'select' | 'result'>('select');
   const [remaining, setRemaining] = useState(20);
-  useEffect(() => { setRemaining(getRemainingCount()); }, []);
+  useEffect(() => { fetchRemaining().then(setRemaining); }, []);
 
   // チャット
   const [messages, setMessages] = useState<Message[]>([]);
@@ -328,8 +328,8 @@ export default function RecipePage() {
       const data = await res.json();
       setDishes(data.dishes ?? []);
       setAiMessage(data.message ?? '');
-      const r = incrementUsage();
-      setRemaining(Math.max(0, 20 - r.count));
+      const r = await incrementUsage();
+      setRemaining(r.remaining);
       const goalLabel = GOALS.find((g) => g.id === goal)?.label;
       setMessages([{ role: 'assistant', content: `${goalLabel ? `【${goalLabel}】` : ''}${selected.length > 0 ? selected.join('・') + 'を補える' : ''}料理を提案しました！${condition ? `（条件: ${condition}）` : ''}\n気になる料理や、他の条件があればチャットで教えてください。` }]);
     } catch {

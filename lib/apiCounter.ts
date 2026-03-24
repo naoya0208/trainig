@@ -1,38 +1,34 @@
 export const USER_API_KEY_STORAGE = 'user_gemini_api_key';
+export const DAILY_LIMIT = 20;
 
 export function getUserApiKey(): string {
   if (typeof window === 'undefined') return '';
   return localStorage.getItem(USER_API_KEY_STORAGE) ?? '';
 }
 
-const KEY = 'gemini_usage';
-const DAILY_LIMIT = 20;
-
-interface Usage {
-  date: string;
-  count: number;
+// サーバーから残り回数を取得
+export async function fetchRemaining(): Promise<number> {
+  try {
+    const apiKey = getUserApiKey();
+    const res = await fetch(`/api/usage?apiKey=${encodeURIComponent(apiKey)}`);
+    const data = await res.json();
+    return data.remaining ?? DAILY_LIMIT;
+  } catch {
+    return DAILY_LIMIT;
+  }
 }
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export function getUsage(): Usage {
-  if (typeof window === 'undefined') return { date: todayStr(), count: 0 };
-  const raw = localStorage.getItem(KEY);
-  if (!raw) return { date: todayStr(), count: 0 };
-  const usage: Usage = JSON.parse(raw);
-  if (usage.date !== todayStr()) return { date: todayStr(), count: 0 };
-  return usage;
-}
-
-export function incrementUsage() {
-  const usage = getUsage();
-  const next = { date: todayStr(), count: usage.count + 1 };
-  localStorage.setItem(KEY, JSON.stringify(next));
-  return next;
-}
-
-export function getRemainingCount() {
-  return Math.max(0, DAILY_LIMIT - getUsage().count);
+// サーバーに使用回数をインクリメント、残り回数を返す
+export async function incrementUsage(): Promise<{ count: number; remaining: number }> {
+  try {
+    const apiKey = getUserApiKey();
+    const res = await fetch('/api/usage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey }),
+    });
+    return await res.json();
+  } catch {
+    return { count: 0, remaining: DAILY_LIMIT };
+  }
 }

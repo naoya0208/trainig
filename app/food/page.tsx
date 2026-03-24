@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, FoodEntry, SavedFood, SavedIngredient, FavoriteGroup, MicroNutrients } from '@/lib/store';
 import { MICRO_DEFS } from '@/lib/micros';
-import { getRemainingCount, incrementUsage, getUserApiKey } from '@/lib/apiCounter';
+import { fetchRemaining, incrementUsage, getUserApiKey } from '@/lib/apiCounter';
 
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
@@ -520,7 +520,7 @@ export default function FoodPage() {
 
   useEffect(() => {
     hydrate();
-    setRemaining(getRemainingCount());
+    fetchRemaining().then(setRemaining);
   }, []);
 
   // デフォルトカテゴリをストアに移行（v2: 既存フラグを無視して再実行）
@@ -565,8 +565,8 @@ export default function FoodPage() {
       const data = await res.json();
       if (data.foods) {
         setResults(data.foods);
-        const r = incrementUsage();
-        setRemaining(Math.max(0, 20 - r.count));
+        const r = await incrementUsage();
+        setRemaining(r.remaining);
       } else setError(data.detail || data.error || '取得に失敗しました');
     } catch (err: any) { setError(err?.message || 'エラーが発生しました'); }
     finally { setLoading(false); }
