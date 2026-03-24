@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const modelConfig: Parameters<typeof genAI.getGenerativeModel>[0] = {
-      model: 'gemini-pro',
+      model: 'gemini-2.5-flash',
       ...(useSearch ? { tools: [{ googleSearch: {} } as any] } : {}),
     };
     const model = genAI.getGenerativeModel(modelConfig);
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     // 検索グラウンディング失敗時はフォールバック
     if (useSearch) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const prompt = isSupplement ? supplementPrompt : foodPrompt;
         const result = await model.generateContent(prompt);
         const text = result.response.text();
