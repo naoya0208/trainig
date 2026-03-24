@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, FoodEntry, SavedFood, SavedIngredient, FavoriteGroup, MicroNutrients } from '@/lib/store';
 import { MICRO_DEFS } from '@/lib/micros';
+import { getRemainingCount, incrementUsage } from '@/lib/apiCounter';
 
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
@@ -497,6 +498,7 @@ export default function FoodPage() {
   const [results, setResults] = useState<AIFood[]>([]);
   const [addedFoods, setAddedFoods] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [remaining, setRemaining] = useState(20);
   const [error, setError] = useState('');
   const [searchMode, setSearchMode] = useState<'food' | 'supplement'>('food');
   // グループ管理
@@ -518,6 +520,7 @@ export default function FoodPage() {
 
   useEffect(() => {
     hydrate();
+    setRemaining(getRemainingCount());
   }, []);
 
   // デフォルトカテゴリをストアに移行（v2: 既存フラグを無視して再実行）
@@ -560,8 +563,11 @@ export default function FoodPage() {
     try {
       const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, mode: searchMode }) });
       const data = await res.json();
-      if (data.foods) { setResults(data.foods); if (data.usedSearch) setError(''); }
-      else setError(data.detail || data.error || '取得に失敗しました');
+      if (data.foods) {
+        setResults(data.foods);
+        const r = incrementUsage();
+        setRemaining(Math.max(0, 20 - r.count));
+      } else setError(data.detail || data.error || '取得に失敗しました');
     } catch (err: any) { setError(err?.message || 'エラーが発生しました'); }
     finally { setLoading(false); }
   }
@@ -702,6 +708,9 @@ export default function FoodPage() {
               {loading ? '...' : '検索'}
             </button>
           </div>
+          <p className={`text-xs mt-2 text-right ${remaining <= 5 ? 'text-red-400 font-semibold' : 'text-gray-400'}`}>
+            AI残り {remaining} 回 / 日
+          </p>
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {results.length > 0 && (
             <div className="mt-4 space-y-4">

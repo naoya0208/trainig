@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { localDate } from '@/lib/date';
 import type { Profile } from '@/lib/calc';
 import InventoryTab, { InventoryItem } from './InventoryTab';
+import { getRemainingCount, incrementUsage } from '@/lib/apiCounter';
 
 const QUICK_CONDITIONS = ['低コスト', '残り物活用', '時短（15分以内）', '簡単', '作り置き'];
 const BASE_NUTRIENTS = ['タンパク質', '脂質', '炭水化物', ...MICRO_DEFS.map((d) => d.label)];
@@ -206,6 +207,8 @@ export default function RecipePage() {
   const [aiMessage, setAiMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<'select' | 'result'>('select');
+  const [remaining, setRemaining] = useState(20);
+  useEffect(() => { setRemaining(getRemainingCount()); }, []);
 
   // チャット
   const [messages, setMessages] = useState<Message[]>([]);
@@ -310,6 +313,8 @@ export default function RecipePage() {
       const data = await res.json();
       setDishes(data.dishes ?? []);
       setAiMessage(data.message ?? '');
+      const r = incrementUsage();
+      setRemaining(Math.max(0, 20 - r.count));
       const goalLabel = GOALS.find((g) => g.id === goal)?.label;
       setMessages([{ role: 'assistant', content: `${goalLabel ? `【${goalLabel}】` : ''}${selected.length > 0 ? selected.join('・') + 'を補える' : ''}料理を提案しました！${condition ? `（条件: ${condition}）` : ''}\n気になる料理や、他の条件があればチャットで教えてください。` }]);
     } catch {
@@ -647,6 +652,9 @@ export default function RecipePage() {
             className="w-full py-3 bg-blue-500 text-white font-semibold rounded-2xl hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             {loading ? '提案中...' : '🍳 料理を提案してもらう'}
           </button>
+          <p className={`text-xs text-right ${remaining <= 5 ? 'text-red-400 font-semibold' : 'text-gray-400'}`}>
+            AI残り {remaining} 回 / 日
+          </p>
 
           {phase === 'result' && (
             <>
