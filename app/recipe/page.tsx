@@ -544,9 +544,15 @@ export default function RecipePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">🥗 栄養補給レシピ提案</h1>
-        <p className="text-sm text-gray-500 mt-1">不足栄養素を選んで、AIに料理を提案してもらおう</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">🥗 栄養補給レシピ提案</h1>
+          <p className="text-sm text-gray-500 mt-1">不足栄養素を選んで、AIに料理を提案してもらおう</p>
+        </div>
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold flex-shrink-0 ${remaining <= 5 ? 'bg-red-100 text-red-500' : remaining <= 10 ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
+          <span>🤖</span>
+          <span>AI残り {remaining} 回</span>
+        </div>
       </div>
 
       {/* タブ */}
@@ -686,9 +692,6 @@ export default function RecipePage() {
             className="w-full py-3 bg-blue-500 text-white font-semibold rounded-2xl hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             {loading ? '提案中...' : '🍳 料理を提案してもらう'}
           </button>
-          <p className={`text-xs text-right ${remaining <= 5 ? 'text-red-400 font-semibold' : 'text-gray-400'}`}>
-            AI残り {remaining} 回 / 日
-          </p>
 
           {phase === 'result' && (
             <>
