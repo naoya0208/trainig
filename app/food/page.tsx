@@ -163,7 +163,7 @@ function EditableFoodCard({ food, meal, onFavorite, onSave, onOnce, isSupplement
   const [expandedIng, setExpandedIng] = useState<number | null>(null);
   const [loadingIng, setLoadingIng] = useState(false);
   const { customCategories: storeCustomCats, addCustomCategory: storeAddCat } = useStore();
-  const editableCategories = [...FOOD_CATEGORIES, ...storeCustomCats];
+  const editableCategories = storeCustomCats.length > 0 ? storeCustomCats : [...FOOD_CATEGORIES];
   const [category, setCategory] = useState<string>(isSupplement ? 'サプリ' : 'その他');
   const [newCatInput, setNewCatInput] = useState('');
   const [showCatAdd, setShowCatAdd] = useState(false);
@@ -504,10 +504,10 @@ export default function FoodPage() {
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [editingCatName, setEditingCatName] = useState<{ original: string; value: string } | null>(null);
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(['__favs__', ...FOOD_CATEGORIES]));
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(['__favs__']));
 
-  // 固定カテゴリ + カスタムカテゴリ
-  const allCategories = [...FOOD_CATEGORIES, ...customCategories];
+  // customCategories のみを使用（初回は FOOD_CATEGORIES で初期化）
+  const allCategories: string[] = customCategories.length > 0 ? customCategories : [...FOOD_CATEGORIES];
   function toggleCategory(cat: string) {
     setOpenCategories(prev => {
       const next = new Set(prev);
@@ -516,7 +516,20 @@ export default function FoodPage() {
     });
   }
 
-  useEffect(() => { hydrate(); }, []);
+  useEffect(() => {
+    hydrate();
+  }, []);
+
+  // デフォルトカテゴリをストアに移行（初回のみ）
+  useEffect(() => {
+    const migrated = localStorage.getItem('food_cats_migrated');
+    if (!migrated && customCategories.length === 0) {
+      FOOD_CATEGORIES.forEach(c => addCustomCategory(c));
+      localStorage.setItem('food_cats_migrated', '1');
+    } else if (!migrated && customCategories.length > 0) {
+      localStorage.setItem('food_cats_migrated', '1');
+    }
+  }, [customCategories.length]);
 
   const todayEntries = foodEntries.filter(e => e.date === eatDate);
   const totalCal = todayEntries.reduce((s, e) => s + e.calories, 0);
@@ -533,7 +546,7 @@ export default function FoodPage() {
   }
   const displayCategoriesAll = [
     ...allCategories.filter(c => allByCategory[c]),
-    ...Object.keys(allByCategory).filter(c => !allCategories.includes(c)),
+    ...Object.keys(allByCategory).filter(c => !(allCategories as string[]).includes(c)),
   ];
 
   const now = new Date(); const hour = now.getHours();
@@ -715,7 +728,6 @@ export default function FoodPage() {
             {/* 全カテゴリ一覧 */}
             <div className="space-y-1.5">
               {allCategories.map(cat => {
-                const isDefault = (FOOD_CATEGORIES as readonly string[]).includes(cat);
                 const isEditing = editingCatName?.original === cat;
                 return (
                   <div key={cat} className="flex items-center gap-2">
@@ -727,7 +739,7 @@ export default function FoodPage() {
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             const newName = editingCatName.value.trim();
-                            if (newName && newName !== cat && !allCategories.includes(newName)) {
+                            if (newName && newName !== cat && !(allCategories as string[]).includes(newName)) {
                               removeCustomCategory(cat);
                               addCustomCategory(newName);
                             }
@@ -739,19 +751,14 @@ export default function FoodPage() {
                         className="flex-1 px-3 py-1.5 text-sm border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
                       />
                     ) : (
-                      <span className={`flex-1 text-sm px-3 py-1.5 rounded-xl ${isDefault ? 'bg-gray-50 text-gray-600' : 'bg-blue-50 text-blue-700'}`}>
-                        {isDefault && <span className="text-gray-400 text-xs mr-1">固定</span>}
-                        {cat}
-                      </span>
+                      <span className="flex-1 text-sm px-3 py-1.5 rounded-xl bg-gray-50 text-gray-700">{cat}</span>
                     )}
-                    {!isDefault && !isEditing && (
+                    {!isEditing && (
                       <button onClick={() => setEditingCatName({ original: cat, value: cat })}
                         className="text-gray-400 hover:text-blue-500 text-sm px-1.5" title="編集">✏️</button>
                     )}
-                    {!isDefault && (
-                      <button onClick={() => removeCustomCategory(cat)}
-                        className="text-gray-300 hover:text-red-400 text-sm px-1" title="削除">✕</button>
-                    )}
+                    <button onClick={() => removeCustomCategory(cat)}
+                      className="text-gray-300 hover:text-red-400 text-sm px-1" title="削除">✕</button>
                   </div>
                 );
               })}
