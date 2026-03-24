@@ -216,6 +216,7 @@ export default function RecipePage() {
   const [detailDish, setDetailDish] = useState<(Dish | SavedRecipe) | null>(null);
   const [detail, setDetail] = useState<DishDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   // カテゴリ
   const [allCategories, setAllCategories] = useState<string[]>(DEFAULT_CATEGORIES);
@@ -348,9 +349,10 @@ export default function RecipePage() {
   // --- 詳細 ---
   async function openDetail(dish: Dish | SavedRecipe) {
     const saved = 'categories' in dish ? dish as SavedRecipe : null;
-    if (saved?.detail) { setDetailDish(dish); setDetail(saved.detail); return; }
+    if (saved?.detail) { setDetailDish(dish); setDetail(saved.detail); setDetailError(null); return; }
     setDetailDish(dish);
     setDetail(null);
+    setDetailError(null);
     setDetailLoading(true);
     try {
       const res = await fetch('/api/gemini/recipe', {
@@ -359,13 +361,17 @@ export default function RecipePage() {
         body: JSON.stringify({ action: 'detail', dishName: dish.name }),
       });
       const data = await res.json();
-      setDetail(data);
-      if (saved) {
-        const updated = savedRecipes.map((r) => r.id === saved.id ? { ...r, detail: data } : r);
-        saveAllRecipes(updated);
+      if (!res.ok || data.error) {
+        setDetailError(data.error ?? `HTTP ${res.status}`);
+      } else {
+        setDetail(data);
+        if (saved) {
+          const updated = savedRecipes.map((r) => r.id === saved.id ? { ...r, detail: data } : r);
+          saveAllRecipes(updated);
+        }
       }
-    } catch {
-      setDetail(null);
+    } catch (e: any) {
+      setDetailError(e?.message ?? '通信エラー');
     } finally {
       setDetailLoading(false);
     }
@@ -787,9 +793,18 @@ export default function RecipePage() {
                 <div className="text-center py-10 text-gray-400 text-sm">詳細を取得中...</div>
               ) : detail ? (
                 <DetailContent detail={detail} />
-              ) : (
-                <div className="text-center py-10 text-gray-400 text-sm">詳細の取得に失敗しました</div>
-              )}
+              ) : detailError ? (
+                <div className="space-y-3">
+                  <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-xl">
+                    <p className="font-medium">取得に失敗しました</p>
+                    <p className="text-xs mt-1 text-red-500 break-all">{detailError}</p>
+                  </div>
+                  <button onClick={() => detailDish && openDetail(detailDish)}
+                    className="w-full py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
+                    再試行
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

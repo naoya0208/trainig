@@ -48,12 +48,15 @@ micros は1人前の概算値を数値で入れてください。不明な場合
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
+      if (!jsonMatch) return NextResponse.json({ error: 'parse error', raw: text.slice(0, 200) }, { status: 500 });
       const detail = JSON.parse(jsonMatch[0]);
       detail.searchUrl = `https://cookpad.com/search/${encodeURIComponent(dishName)}`;
       return NextResponse.json(detail);
     } catch (e: any) {
-      return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
+      console.error('[recipe/detail]', e);
+      const status = e?.status ?? 500;
+      const msg = e?.message ?? String(e);
+      return NextResponse.json({ error: msg }, { status });
     }
   }
 
@@ -70,7 +73,8 @@ micros は1人前の概算値を数値で入れてください。不明な場合
       const result = await chat.sendMessage(lastMessage);
       return NextResponse.json({ reply: result.response.text() });
     } catch (e: any) {
-      return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
+      console.error('[recipe/chat]', e);
+      return NextResponse.json({ error: e?.message ?? String(e) }, { status: e?.status ?? 500 });
     }
   }
 
@@ -106,6 +110,7 @@ nutritionは1人前の概算値を数値で入れてください。`;
     if (!jsonMatch) return NextResponse.json({ error: 'parse error' }, { status: 500 });
     return NextResponse.json(JSON.parse(jsonMatch[0]));
   } catch (e: any) {
-    return NextResponse.json({ error: 'Gemini API error', detail: e?.message }, { status: 500 });
+    console.error('[recipe/propose]', e);
+    return NextResponse.json({ error: e?.message ?? String(e) }, { status: e?.status ?? 500 });
   }
 }
