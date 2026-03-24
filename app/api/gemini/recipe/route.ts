@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 }
 micros は1人前の概算値を数値で入れてください。不明な場合は0としてください。`;
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -68,7 +68,7 @@ micros は1人前の概算値を数値で入れてください。不明な場合
     }));
     const lastMessage = messages[messages.length - 1].content;
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const chat = model.startChat({ history });
       const result = await chat.sendMessage(lastMessage);
       return NextResponse.json({ reply: result.response.text() });
@@ -103,7 +103,7 @@ ${goalInstruction ? `\n${goalInstruction}\n` : ''}
 nutritionは1人前の概算値を数値で入れてください。`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
