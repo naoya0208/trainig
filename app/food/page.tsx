@@ -480,7 +480,7 @@ function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
 
 export default function FoodPage() {
   const { foodEntries, savedFoods, favoriteGroups, customCategories, addFood, removeFood, updateFood, saveFoodToHistory, removeSavedFood, updateSavedFoodCategory, addCustomCategory, removeCustomCategory, toggleFavorite, addFavoriteGroup, updateFavoriteGroup, removeFavoriteGroup, hydrate } = useStore();
-  const [tab, setTab] = useState<'ai' | 'favorites' | 'history'>('ai');
+  const [tab, setTab] = useState<'ai' | 'favorites' | 'history' | 'categories'>('ai');
   const [query, setQuery] = useState('');
   function mealFromTime(time: string): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
     const h = parseInt(time.split(':')[0]);
@@ -666,7 +666,7 @@ export default function FoodPage() {
 
       {/* タブ */}
       <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl">
-        {([['ai', '✨ AI検索'], ['favorites', '★ お気に入り'], ['history', '🕐 履歴']] as const).map(([t, l]) => (
+        {([['ai', '✨ AI検索'], ['favorites', '★ お気に入り'], ['history', '🕐 履歴'], ['categories', '📂 カテゴリ']] as const).map(([t, l]) => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${tab === t ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>
             {l}
@@ -723,70 +723,6 @@ export default function FoodPage() {
       {/* お気に入り */}
       {tab === 'favorites' && (
         <div className="space-y-4 mb-5">
-          {/* カテゴリ管理 */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-            <p className="text-sm font-semibold text-gray-600">カテゴリ管理</p>
-
-            {/* 全カテゴリ一覧 */}
-            <div className="space-y-1.5">
-              {allCategories.map(cat => {
-                const isEditing = editingCatName?.original === cat;
-                return (
-                  <div key={cat} className="flex items-center gap-2">
-                    {isEditing ? (
-                      <input
-                        autoFocus
-                        value={editingCatName.value}
-                        onChange={e => setEditingCatName({ original: cat, value: e.target.value })}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            const newName = editingCatName.value.trim();
-                            if (newName && newName !== cat && !(allCategories as string[]).includes(newName)) {
-                              removeCustomCategory(cat);
-                              addCustomCategory(newName);
-                            }
-                            setEditingCatName(null);
-                          }
-                          if (e.key === 'Escape') setEditingCatName(null);
-                        }}
-                        onBlur={() => setEditingCatName(null)}
-                        className="flex-1 px-3 py-1.5 text-sm border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      />
-                    ) : (
-                      <span className="flex-1 text-sm px-3 py-1.5 rounded-xl bg-gray-50 text-gray-700">{cat}</span>
-                    )}
-                    {!isEditing && (
-                      <button onClick={() => setEditingCatName({ original: cat, value: cat })}
-                        className="text-gray-400 hover:text-blue-500 text-sm px-1.5" title="編集">✏️</button>
-                    )}
-                    <button onClick={() => removeCustomCategory(cat)}
-                      className="text-gray-300 hover:text-red-400 text-sm px-1" title="削除">✕</button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 新規作成 */}
-            <div className="flex gap-2 pt-1 border-t border-gray-100">
-              <input
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-                placeholder="新しいカテゴリ名"
-                value={newCatName}
-                onChange={e => setNewCatName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && newCatName.trim()) {
-                    addCustomCategory(newCatName.trim());
-                    setNewCatName('');
-                  }
-                }} />
-              <button
-                onClick={() => { if (newCatName.trim()) { addCustomCategory(newCatName.trim()); setNewCatName(''); } }}
-                className="bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold">
-                作成
-              </button>
-            </div>
-          </div>
-
           {/* グループセクション */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
@@ -946,6 +882,83 @@ export default function FoodPage() {
                 <SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} allCategories={allCategories} onCategoryChange={updateSavedFoodCategory} />
               </SwipeToDelete>
             ))}
+        </div>
+      )}
+
+      {/* カテゴリ管理 */}
+      {tab === 'categories' && (
+        <div className="space-y-4 mb-5">
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+            <div>
+              <p className="text-base font-bold text-gray-800">📂 カテゴリ管理</p>
+              <p className="text-xs text-gray-400 mt-0.5">お気に入りで使うカテゴリを自由に追加・編集・削除できます</p>
+            </div>
+
+            {allCategories.length === 0 ? (
+              <p className="text-sm text-gray-300 text-center py-4">カテゴリがありません</p>
+            ) : (
+              <div className="space-y-2">
+                {allCategories.map(cat => {
+                  const isEditing = editingCatName?.original === cat;
+                  const count = (allByCategory[cat] ?? []).length;
+                  return (
+                    <div key={cat} className="flex items-center gap-2">
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={editingCatName.value}
+                          onChange={e => setEditingCatName({ original: cat, value: e.target.value })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              const newName = editingCatName.value.trim();
+                              if (newName && newName !== cat && !(allCategories as string[]).includes(newName)) {
+                                removeCustomCategory(cat);
+                                addCustomCategory(newName);
+                              }
+                              setEditingCatName(null);
+                            }
+                            if (e.key === 'Escape') setEditingCatName(null);
+                          }}
+                          onBlur={() => setEditingCatName(null)}
+                          className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        />
+                      ) : (
+                        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50">
+                          <span className="text-sm text-gray-700 flex-1">{cat}</span>
+                          {count > 0 && <span className="text-xs text-gray-400">{count}品</span>}
+                        </div>
+                      )}
+                      {!isEditing && (
+                        <button onClick={() => setEditingCatName({ original: cat, value: cat })}
+                          className="text-gray-400 hover:text-blue-500 text-sm px-2 py-2 rounded-lg hover:bg-gray-50" title="編集">✏️</button>
+                      )}
+                      <button onClick={() => removeCustomCategory(cat)}
+                        className="text-gray-300 hover:text-red-400 text-sm px-2 py-2 rounded-lg hover:bg-red-50" title="削除">✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <input
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="新しいカテゴリ名"
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newCatName.trim()) {
+                    addCustomCategory(newCatName.trim());
+                    setNewCatName('');
+                  }
+                }} />
+              <button
+                onClick={() => { if (newCatName.trim()) { addCustomCategory(newCatName.trim()); setNewCatName(''); } }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">
+                ＋追加
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
