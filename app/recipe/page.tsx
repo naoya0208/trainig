@@ -27,9 +27,10 @@ const MEAL_OPTIONS = [
 
 function profileToGoal(profile: Profile | null): GoalId | null {
   if (!profile) return null;
+  // goalType を最優先（減量中は目的に関わらずダイエット）
+  if (profile.goalType === 'lose') return 'diet';
   if (profile.goalPurpose === 'beauty') return 'beauty';
   if (profile.goalPurpose === 'muscle' || profile.goalType === 'gain') return 'muscle';
-  if (profile.goalType === 'lose') return 'diet';
   return 'health';
 }
 
@@ -186,7 +187,8 @@ export default function RecipePage() {
 
   // 目的・栄養素
   const [goal, setGoal] = useState<GoalId | null>(null);
-  const [goalOverridden, setGoalOverridden] = useState(false);
+  const [goalIsManual, setGoalIsManual] = useState(false); // UI表示用
+  const goalManualRef = useRef(false);                     // effect制御用（stateにするとeffectが再実行される）
   const [showGoalOverride, setShowGoalOverride] = useState(false);
 
   // 食事登録モーダル
@@ -241,12 +243,12 @@ export default function RecipePage() {
     setAllCategories(c ? JSON.parse(c) : DEFAULT_CATEGORIES);
   }, []);
 
-  // プロフィールから目的を自動設定
+  // プロフィールから目的を自動設定（手動変更済みなら上書きしない）
   useEffect(() => {
-    if (!goalOverridden) {
+    if (!goalManualRef.current) {
       setGoal(profileToGoal(profile));
     }
-  }, [profile, goalOverridden]);
+  }, [profile]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -540,7 +542,7 @@ export default function RecipePage() {
                 <span className="text-xl">{GOALS.find((g) => g.id === goal)?.icon}</span>
                 <div>
                   <div className="text-sm font-medium text-gray-800">{GOALS.find((g) => g.id === goal)?.label}</div>
-                  <div className="text-xs text-gray-400">{goalOverridden ? '手動設定' : '設定タブから自動設定'}</div>
+                  <div className="text-xs text-gray-400">{goalIsManual ? '手動設定' : '設定タブから自動設定'}</div>
                 </div>
               </div>
             ) : (
@@ -549,15 +551,15 @@ export default function RecipePage() {
             {showGoalOverride && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                 {GOALS.map((g) => (
-                  <button key={g.id} onClick={() => { setGoal(g.id); setGoalOverridden(true); setShowGoalOverride(false); }}
+                  <button key={g.id} onClick={() => { setGoal(g.id); goalManualRef.current = true; setGoalIsManual(true); setShowGoalOverride(false); }}
                     className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-left transition-all
                       ${goal === g.id ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
                     <span className="text-base">{g.icon} <span className="text-sm font-medium">{g.label}</span></span>
                     <span className="text-xs text-gray-400 mt-0.5">{g.desc}</span>
                   </button>
                 ))}
-                {goalOverridden && (
-                  <button onClick={() => { setGoalOverridden(false); setGoal(profileToGoal(profile)); setShowGoalOverride(false); }}
+                {goalIsManual && (
+                  <button onClick={() => { goalManualRef.current = false; setGoalIsManual(false); setGoal(profileToGoal(profile)); setShowGoalOverride(false); }}
                     className="col-span-full text-xs text-blue-500 hover:text-blue-600 text-center py-1">
                     設定タブの目標に戻す
                   </button>
