@@ -1,3 +1,10 @@
+export const USER_API_KEY_STORAGE = 'user_gemini_api_key';
+
+export function getUserApiKey(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(USER_API_KEY_STORAGE) ?? '';
+}
+
 const KEY = 'gemini_usage';
 const DAILY_LIMIT = 20;
 

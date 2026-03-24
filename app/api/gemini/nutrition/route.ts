@@ -1,10 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
 export async function POST(req: NextRequest) {
-  const { profile, targets, consumed, todayEntries, currentTime } = await req.json();
+  const { profile, targets, consumed, todayEntries, currentTime, apiKey } = await req.json();
+  const genAI = new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY!);
 
   const prompt = `
 あなたは管理栄養士AIです。以下のデータを分析して、栄養摂取状況と今後の食事タイミングのアドバイスをしてください。

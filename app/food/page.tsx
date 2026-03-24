@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, FoodEntry, SavedFood, SavedIngredient, FavoriteGroup, MicroNutrients } from '@/lib/store';
 import { MICRO_DEFS } from '@/lib/micros';
-import { getRemainingCount, incrementUsage } from '@/lib/apiCounter';
+import { getRemainingCount, incrementUsage, getUserApiKey } from '@/lib/apiCounter';
 
 const MEAL_LABELS: Record<string, string> = { breakfast: '朝食', lunch: '昼食', dinner: '夕食', snack: '間食' };
 
@@ -561,7 +561,7 @@ export default function FoodPage() {
     if (!query.trim()) return;
     setLoading(true); setError(''); setResults([]); setAddedFoods(new Set());
     try {
-      const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, mode: searchMode }) });
+      const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, mode: searchMode, apiKey: getUserApiKey() }) });
       const data = await res.json();
       if (data.foods) {
         setResults(data.foods);

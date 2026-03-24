@@ -1,11 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { action, nutrients, condition, goal, messages, dishName } = body;
+  const { action, nutrients, condition, goal, messages, dishName, apiKey } = body;
+  const genAI = new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY!);
 
   const GOAL_INSTRUCTIONS: Record<string, string> = {
     diet:    '【最優先】減量・ダイエット目的。低カロリー・低脂質・高たんぱくで腹持ちの良い料理を優先してください。揚げ物や高糖質な料理は避けてください。',

@@ -1,8 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
 const NUTRIENT_KEYS = [
   'fiber','vitaminD','vitaminB12','vitaminC','iron','calcium','zinc','omega3','sodium',
   'vitaminE','vitaminA','biotin','vitaminB2','niacin','pantothenicAcid','magnesium',
@@ -10,7 +8,8 @@ const NUTRIENT_KEYS = [
 ];
 
 export async function POST(req: NextRequest) {
-  const { query } = await req.json();
+  const { query, apiKey } = await req.json();
+  const genAI = new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY!);
   if (!query) return NextResponse.json({ error: 'query required' }, { status: 400 });
 
   const prompt = `

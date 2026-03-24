@@ -1,10 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
 export async function POST(req: NextRequest) {
-  const { profile, type } = await req.json();
+  const { profile, type, apiKey } = await req.json();
+  const genAI = new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY!);
 
   const prompts: Record<string, string> = {
     targetWeight: `

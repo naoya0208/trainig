@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { localDate } from '@/lib/date';
 import type { Profile } from '@/lib/calc';
 import InventoryTab, { InventoryItem } from './InventoryTab';
-import { getRemainingCount, incrementUsage } from '@/lib/apiCounter';
+import { getRemainingCount, incrementUsage, getUserApiKey } from '@/lib/apiCounter';
 
 const QUICK_CONDITIONS = ['低コスト', '残り物活用', '時短（15分以内）', '簡単', '作り置き'];
 const BASE_NUTRIENTS = ['タンパク質', '脂質', '炭水化物', ...MICRO_DEFS.map((d) => d.label)];
@@ -308,7 +308,7 @@ export default function RecipePage() {
       const res = await fetch('/api/gemini/recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nutrients: selected, condition, goal }),
+        body: JSON.stringify({ nutrients: selected, condition, goal, apiKey: getUserApiKey() }),
       });
       const data = await res.json();
       setDishes(data.dishes ?? []);
@@ -341,7 +341,7 @@ export default function RecipePage() {
       const res = await fetch('/api/gemini/recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nutrients: selected, condition, messages: chatMessages }),
+        body: JSON.stringify({ nutrients: selected, condition, messages: chatMessages, apiKey: getUserApiKey() }),
       });
       const data = await res.json();
       setMessages([...newMessages, { role: 'assistant', content: data.reply ?? 'エラーが発生しました。' }]);
@@ -364,7 +364,7 @@ export default function RecipePage() {
       const res = await fetch('/api/gemini/recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'detail', dishName: dish.name }),
+        body: JSON.stringify({ action: 'detail', dishName: dish.name, apiKey: getUserApiKey() }),
       });
       const data = await res.json();
       if (!res.ok || data.error) {

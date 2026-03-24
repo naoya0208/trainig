@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { Profile, ActivityLevel, GoalType, GoalPurpose, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight, getMenstrualPhase } from '@/lib/calc';
 import { CustomMedication } from '@/lib/medications';
 import { localDate } from '@/lib/date';
+import { USER_API_KEY_STORAGE } from '@/lib/apiCounter';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
   { value: 1.2,   label: 'ほぼ非活動的', desc: 'デスクワーク・ほぼ運動なし' },
@@ -48,10 +49,13 @@ function ProfileContent() {
   const [saved, setSaved] = useState(false);
   const [syncInput, setSyncInput] = useState('');
   const [syncMsg, setSyncMsg] = useState('');
+  const [userApiKey, setUserApiKey] = useState('');
+  const [apiKeySaved, setApiKeySaved] = useState(false);
 
   useEffect(() => {
     hydrate();
     setSyncInput(syncCode);
+    setUserApiKey(localStorage.getItem(USER_API_KEY_STORAGE) ?? '');
   }, []);
 
   async function handleSyncLoad() {
@@ -737,6 +741,42 @@ function ProfileContent() {
       </button>
 
       {/* デバイス同期 */}
+      {/* Gemini APIキー設定 */}
+      <div className="bg-white rounded-2xl p-6 mt-4 shadow-sm">
+        <h2 className="font-bold text-gray-800 mb-1">🤖 Gemini APIキー</h2>
+        <p className="text-xs text-gray-400 mb-3">
+          設定するとAI機能がこのキーで動作します。1日20回の上限が各自に適用されます。
+          <br />取得先: <span className="text-blue-500">aistudio.google.com</span> → Get API key
+        </p>
+        <div className="flex gap-2 mb-2">
+          <input
+            type="password"
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="AIzaSy..."
+            value={userApiKey}
+            onChange={e => { setUserApiKey(e.target.value); setApiKeySaved(false); }}
+          />
+          <button
+            onClick={() => {
+              localStorage.setItem(USER_API_KEY_STORAGE, userApiKey.trim());
+              setApiKeySaved(true);
+              setTimeout(() => setApiKeySaved(false), 2000);
+            }}
+            className="bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700">
+            保存
+          </button>
+          {userApiKey && (
+            <button
+              onClick={() => { localStorage.removeItem(USER_API_KEY_STORAGE); setUserApiKey(''); }}
+              className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
+              削除
+            </button>
+          )}
+        </div>
+        {apiKeySaved && <p className="text-xs text-green-600">✓ 保存しました</p>}
+        {userApiKey && !apiKeySaved && <p className="text-xs text-blue-600">APIキーが設定されています</p>}
+      </div>
+
       <div className="bg-white rounded-2xl p-6 mt-4 shadow-sm">
         <h2 className="font-bold text-gray-800 mb-1">デバイス同期</h2>
         <p className="text-xs text-gray-400 mb-4">同じ同期コードを複数デバイスで使うとデータが共有されます。Apple Watchショートカットにも使用します。</p>

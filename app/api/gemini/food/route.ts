@@ -1,10 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
 export async function POST(req: NextRequest) {
-  const { query, mode } = await req.json();
+  const { query, mode, apiKey } = await req.json();
+  const genAI = new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY!);
   if (!query) return NextResponse.json({ error: 'query required' }, { status: 400 });
 
   const isSupplement = mode === 'supplement';
