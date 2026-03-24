@@ -162,7 +162,11 @@ function EditableFoodCard({ food, meal, onFavorite, onSave, onOnce, isSupplement
   const [showAdd, setShowAdd] = useState(false);
   const [expandedIng, setExpandedIng] = useState<number | null>(null);
   const [loadingIng, setLoadingIng] = useState(false);
-  const [category, setCategory] = useState<FoodCategory>(isSupplement ? 'サプリ' : 'その他');
+  const { customCategories: storeCustomCats, addCustomCategory: storeAddCat } = useStore();
+  const editableCategories = [...FOOD_CATEGORIES, ...storeCustomCats];
+  const [category, setCategory] = useState<string>(isSupplement ? 'サプリ' : 'その他');
+  const [newCatInput, setNewCatInput] = useState('');
+  const [showCatAdd, setShowCatAdd] = useState(false);
 
   async function addIngredientWithAI() {
     const name = newIngName.trim();
@@ -223,12 +227,35 @@ function EditableFoodCard({ food, meal, onFavorite, onSave, onOnce, isSupplement
         </div>
       </div>
       {/* カテゴリ選択 */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs text-gray-400 flex-shrink-0">カテゴリ</span>
-        <select value={category} onChange={e => setCategory(e.target.value as FoodCategory)}
-          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
-          {FOOD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+      <div className="mb-3 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 flex-shrink-0">カテゴリ</span>
+          <select value={category} onChange={e => setCategory(e.target.value)}
+            className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
+            {editableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <button onClick={() => setShowCatAdd(!showCatAdd)}
+            className="text-xs text-blue-500 hover:text-blue-600 px-1 shrink-0">＋追加</button>
+        </div>
+        {showCatAdd && (
+          <div className="flex gap-1">
+            <input value={newCatInput} onChange={e => setNewCatInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  const n = newCatInput.trim();
+                  if (n && !editableCategories.includes(n)) { storeAddCat(n); setCategory(n); }
+                  setNewCatInput(''); setShowCatAdd(false);
+                }
+              }}
+              placeholder="新しいカテゴリ名..."
+              className="flex-1 text-xs border border-blue-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            <button onClick={() => {
+              const n = newCatInput.trim();
+              if (n && !editableCategories.includes(n)) { storeAddCat(n); setCategory(n); }
+              setNewCatInput(''); setShowCatAdd(false);
+            }} className="text-xs bg-blue-500 text-white px-2 py-1 rounded-lg">OK</button>
+          </div>
+        )}
       </div>
 
       <div className="bg-gray-50 rounded-xl p-3 mb-3">
@@ -476,6 +503,7 @@ export default function FoodPage() {
   const [newGroupName, setNewGroupName] = useState('');
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
+  const [editingCatName, setEditingCatName] = useState<{ original: string; value: string } | null>(null);
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(['__favs__', ...FOOD_CATEGORIES]));
 
   // 固定カテゴリ + カスタムカテゴリ
@@ -681,26 +709,56 @@ export default function FoodPage() {
       {tab === 'favorites' && (
         <div className="space-y-4 mb-5">
           {/* カテゴリ管理 */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-sm font-semibold text-gray-600 mb-3">カテゴリ管理</p>
-            {/* カスタムカテゴリ一覧 */}
-            {customCategories.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
-                {customCategories.map(cat => (
-                  <div key={cat} className="flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
-                    <span className="text-sm text-blue-700">{cat}</span>
-                    <button
-                      onClick={() => removeCustomCategory(cat)}
-                      className="text-blue-300 hover:text-red-400 ml-1 leading-none text-xs">✕</button>
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+            <p className="text-sm font-semibold text-gray-600">カテゴリ管理</p>
+
+            {/* 全カテゴリ一覧 */}
+            <div className="space-y-1.5">
+              {allCategories.map(cat => {
+                const isDefault = (FOOD_CATEGORIES as readonly string[]).includes(cat);
+                const isEditing = editingCatName?.original === cat;
+                return (
+                  <div key={cat} className="flex items-center gap-2">
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        value={editingCatName.value}
+                        onChange={e => setEditingCatName({ original: cat, value: e.target.value })}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const newName = editingCatName.value.trim();
+                            if (newName && newName !== cat && !allCategories.includes(newName)) {
+                              removeCustomCategory(cat);
+                              addCustomCategory(newName);
+                            }
+                            setEditingCatName(null);
+                          }
+                          if (e.key === 'Escape') setEditingCatName(null);
+                        }}
+                        onBlur={() => setEditingCatName(null)}
+                        className="flex-1 px-3 py-1.5 text-sm border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      />
+                    ) : (
+                      <span className={`flex-1 text-sm px-3 py-1.5 rounded-xl ${isDefault ? 'bg-gray-50 text-gray-600' : 'bg-blue-50 text-blue-700'}`}>
+                        {isDefault && <span className="text-gray-400 text-xs mr-1">固定</span>}
+                        {cat}
+                      </span>
+                    )}
+                    {!isDefault && !isEditing && (
+                      <button onClick={() => setEditingCatName({ original: cat, value: cat })}
+                        className="text-gray-400 hover:text-blue-500 text-sm px-1.5" title="編集">✏️</button>
+                    )}
+                    {!isDefault && (
+                      <button onClick={() => removeCustomCategory(cat)}
+                        className="text-gray-300 hover:text-red-400 text-sm px-1" title="削除">✕</button>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-            {customCategories.length === 0 && (
-              <p className="text-xs text-gray-300 mb-3">カスタムカテゴリがありません</p>
-            )}
+                );
+              })}
+            </div>
+
             {/* 新規作成 */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1 border-t border-gray-100">
               <input
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                 placeholder="新しいカテゴリ名"

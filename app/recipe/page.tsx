@@ -4,6 +4,7 @@ import { MICRO_DEFS } from '@/lib/micros';
 import { useStore } from '@/lib/store';
 import { localDate } from '@/lib/date';
 import type { Profile } from '@/lib/calc';
+import InventoryTab, { InventoryItem } from './InventoryTab';
 
 const QUICK_CONDITIONS = ['低コスト', '残り物活用', '時短（15分以内）', '簡単', '作り置き'];
 const BASE_NUTRIENTS = ['タンパク質', '脂質', '炭水化物', ...MICRO_DEFS.map((d) => d.label)];
@@ -183,7 +184,7 @@ function DetailContent({ detail }: { detail: DishDetail }) {
 
 export default function RecipePage() {
   const { profile, addFood, saveFoodToHistory, hydrate } = useStore();
-  const [tab, setTab] = useState<'propose' | 'saved'>('propose');
+  const [tab, setTab] = useState<'propose' | 'saved' | 'inventory'>('propose');
 
   // 目的・栄養素
   const [goal, setGoal] = useState<GoalId | null>(null);
@@ -409,6 +410,15 @@ export default function RecipePage() {
     if ('id' in (detailDish ?? {}) && (detailDish as SavedRecipe)?.id === id) setDetailDish(null);
   }
 
+  // --- 在庫からレシピ検索 ---
+  function handleSearchFromInventory(items: InventoryItem[]) {
+    setTab('propose');
+    setCondition(items.map((i) => i.name).join('、') + 'を使って');
+    setPhase('select');
+    setDishes([]);
+    setMessages([]);
+  }
+
   // --- 食事に追加 ---
   function addRecipeToMeal() {
     if (!addToMealRecipe) return;
@@ -522,12 +532,16 @@ export default function RecipePage() {
       {/* タブ */}
       <div className="flex bg-gray-100 rounded-xl p-1">
         <button onClick={() => setTab('propose')}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${tab === 'propose' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>
+          className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${tab === 'propose' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>
           🍳 提案する
         </button>
         <button onClick={() => setTab('saved')}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${tab === 'saved' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>
+          className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${tab === 'saved' ? 'bg-white shadow text-blue-600' : 'text-gray-500'}`}>
           📌 保存済み{savedRecipes.length > 0 && <span className="ml-1 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">{savedRecipes.length}</span>}
+        </button>
+        <button onClick={() => setTab('inventory')}
+          className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${tab === 'inventory' ? 'bg-white shadow text-green-600' : 'text-gray-500'}`}>
+          📦 在庫
         </button>
       </div>
 
@@ -777,6 +791,11 @@ export default function RecipePage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ===== 在庫タブ ===== */}
+      {tab === 'inventory' && (
+        <InventoryTab onSearchFromInventory={handleSearchFromInventory} />
       )}
 
       {/* ===== 詳細モーダル ===== */}
