@@ -187,10 +187,8 @@ export const useStore = create<Store>((set, get) => ({
     const idx = existing.findIndex(f => f.foodName === food.foodName);
     let next: SavedFood[];
     if (idx >= 0) {
-      next = existing.map((f, i) => i === idx
-        ? { ...f, useCount: f.useCount + 1, lastUsed: food.lastUsed, grams: food.grams, isFavorite: food.isFavorite ?? f.isFavorite, category: food.category ?? f.category }
-        : f
-      );
+      const updated = { ...existing[idx], useCount: existing[idx].useCount + 1, lastUsed: food.lastUsed, grams: food.grams, isFavorite: food.isFavorite ?? existing[idx].isFavorite, category: food.category ?? existing[idx].category };
+      next = [...existing.filter((_, i) => i !== idx), updated];
     } else {
       next = [...existing, food];
     }

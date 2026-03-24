@@ -537,7 +537,7 @@ export default function FoodPage() {
   const totalCal = todayEntries.reduce((s, e) => s + e.calories, 0);
   const totalProtein = todayEntries.reduce((s, e) => s + e.protein, 0);
   const favorites = savedFoods.filter(f => f.isFavorite);
-  const history = [...savedFoods].sort((a, b) => b.lastUsed.localeCompare(a.lastUsed));
+  const history = [...savedFoods].reverse();
 
   // 全保存食品をカテゴリ別に分類（フラット）
   const allByCategory: Record<string, SavedFood[]> = {};
@@ -561,8 +561,8 @@ export default function FoodPage() {
       const res = await fetch('/api/gemini/food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, mode: searchMode }) });
       const data = await res.json();
       if (data.foods) { setResults(data.foods); if (data.usedSearch) setError(''); }
-      else setError('取得に失敗しました');
-    } catch { setError('エラーが発生しました'); }
+      else setError(data.detail || data.error || '取得に失敗しました');
+    } catch (err: any) { setError(err?.message || 'エラーが発生しました'); }
     finally { setLoading(false); }
   }
 
