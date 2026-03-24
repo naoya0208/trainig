@@ -62,7 +62,7 @@ ${NUTRIENT_KEYS.join(', ')}
   try {
     // まずGoogle検索グラウンディングで最新情報を取得
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-pro',
       tools: [{ googleSearch: {} } as any],
     });
     const result = await model.generateContent(prompt);
@@ -73,7 +73,7 @@ ${NUTRIENT_KEYS.join(', ')}
   } catch {
     // フォールバック: 検索なし
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
       const result = await model.generateContent(prompt);
       const data = extract(result.response.text());
       if (!data) return NextResponse.json({ error: 'parse error' }, { status: 500 });
