@@ -523,13 +523,15 @@ export default function FoodPage() {
   // デフォルトカテゴリをストアに移行（初回のみ）
   useEffect(() => {
     const migrated = localStorage.getItem('food_cats_migrated');
-    if (!migrated && customCategories.length === 0) {
-      FOOD_CATEGORIES.forEach(c => addCustomCategory(c));
-      localStorage.setItem('food_cats_migrated', '1');
-    } else if (!migrated && customCategories.length > 0) {
+    if (!migrated) {
+      const stored = localStorage.getItem('ct_custom_cats');
+      const existing: string[] = stored ? JSON.parse(stored) : [];
+      FOOD_CATEGORIES.forEach(c => {
+        if (!existing.includes(c)) addCustomCategory(c);
+      });
       localStorage.setItem('food_cats_migrated', '1');
     }
-  }, [customCategories.length]);
+  }, []);
 
   const todayEntries = foodEntries.filter(e => e.date === eatDate);
   const totalCal = todayEntries.reduce((s, e) => s + e.calories, 0);
