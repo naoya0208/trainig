@@ -103,6 +103,8 @@ interface Store {
   customMedications: CustomMedication[];
   syncCode: string;
   syncing: boolean;
+  userApiKey: string;
+  setUserApiKey: (key: string) => void;
   setProfile: (p: Profile) => void;
   addFood: (e: FoodEntry) => void;
   removeFood: (id: string) => void;
@@ -132,7 +134,7 @@ const KEYS = {
   profile: 'ct_profile', food: 'ct_food', weight: 'ct_weight',
   workout: 'ct_workout', syncCode: 'ct_sync_code', savedFoods: 'ct_saved_foods',
   favoriteGroups: 'ct_fav_groups', customCategories: 'ct_custom_cats',
-  water: 'ct_water', customMedications: 'ct_meds',
+  water: 'ct_water', customMedications: 'ct_meds', userApiKey: 'ct_user_api_key',
 };
 
 function save<T>(key: string, val: T) {
@@ -155,6 +157,8 @@ export const useStore = create<Store>((set, get) => ({
   customMedications: [],
   syncCode: '',
   syncing: false,
+  userApiKey: '',
+  setUserApiKey: (key) => { set({ userApiKey: key }); save(KEYS.userApiKey, key); get().syncToCloud(); },
 
   setProfile: (p) => { set({ profile: p }); save(KEYS.profile, p); get().syncToCloud(); },
   addFood: (e) => {
@@ -258,12 +262,13 @@ export const useStore = create<Store>((set, get) => ({
   setSyncCode: (code) => { set({ syncCode: code }); save(KEYS.syncCode, code); },
 
   syncToCloud: async () => {
-    const { syncCode, profile, foodEntries, weightEntries, workoutSessions, savedFoods, favoriteGroups } = get();
+    const { syncCode, profile, foodEntries, weightEntries, workoutSessions, savedFoods, favoriteGroups, userApiKey } = get();
     if (!syncCode || !profile) return;
     await supabase.from('user_data').upsert({
       sync_code: syncCode, profile, food_entries: foodEntries,
       weight_entries: weightEntries, workout_sessions: workoutSessions,
       saved_foods: savedFoods, favorite_groups: favoriteGroups,
+      user_api_key: userApiKey,
       updated_at: new Date().toISOString(),
     });
   },
@@ -277,11 +282,12 @@ export const useStore = create<Store>((set, get) => ({
     const workoutSessions = data.workout_sessions as WorkoutSession[];
     const savedFoods = (data.saved_foods as SavedFood[]) ?? [];
     const favoriteGroups = (data.favorite_groups as FavoriteGroup[]) ?? [];
-    set({ profile, foodEntries, weightEntries, workoutSessions, savedFoods, favoriteGroups, syncCode: code });
+    const userApiKey = (data.user_api_key as string) ?? '';
+    set({ profile, foodEntries, weightEntries, workoutSessions, savedFoods, favoriteGroups, syncCode: code, userApiKey });
     save(KEYS.profile, profile); save(KEYS.food, foodEntries);
     save(KEYS.weight, weightEntries); save(KEYS.workout, workoutSessions);
     save(KEYS.savedFoods, savedFoods); save(KEYS.favoriteGroups, favoriteGroups);
-    save(KEYS.syncCode, code);
+    save(KEYS.syncCode, code); save(KEYS.userApiKey, userApiKey);
     return true;
   },
 
@@ -297,6 +303,7 @@ export const useStore = create<Store>((set, get) => ({
       workoutSessions: load(KEYS.workout, []),
       waterEntries: load(KEYS.water, []),
       customMedications: load(KEYS.customMedications, []),
+      userApiKey: load(KEYS.userApiKey, ''),
       syncCode,
     });
     if (syncCode) get().loadFromCloud(syncCode);

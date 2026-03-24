@@ -5,7 +5,6 @@ import { useStore } from '@/lib/store';
 import { Profile, ActivityLevel, GoalType, GoalPurpose, calcBMR, calcTDEE, calcTargetCalories, calcBMI, getBMIStatus, calcIdealWeight, getEffectiveTargetWeight, getMenstrualPhase } from '@/lib/calc';
 import { CustomMedication } from '@/lib/medications';
 import { localDate } from '@/lib/date';
-import { USER_API_KEY_STORAGE } from '@/lib/apiCounter';
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
   { value: 1.2,   label: 'ほぼ非活動的', desc: 'デスクワーク・ほぼ運動なし' },
@@ -17,7 +16,8 @@ const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
 
 function ProfileContent() {
   const { profile, setProfile, hydrate, syncCode, setSyncCode, loadFromCloud, syncToCloud,
-          customMedications, addCustomMedication, removeCustomMedication } = useStore();
+          customMedications, addCustomMedication, removeCustomMedication,
+          userApiKey: storeApiKey, setUserApiKey: storeSetUserApiKey } = useStore();
   const searchParams = useSearchParams();
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [age, setAge] = useState('');
@@ -49,14 +49,18 @@ function ProfileContent() {
   const [saved, setSaved] = useState(false);
   const [syncInput, setSyncInput] = useState('');
   const [syncMsg, setSyncMsg] = useState('');
-  const [userApiKey, setUserApiKey] = useState('');
+  const [localApiKey, setLocalApiKey] = useState('');
   const [apiKeySaved, setApiKeySaved] = useState(false);
 
   useEffect(() => {
     hydrate();
     setSyncInput(syncCode);
-    setUserApiKey(localStorage.getItem(USER_API_KEY_STORAGE) ?? '');
   }, []);
+
+  // ストアのAPIキーをローカル入力に反映
+  useEffect(() => {
+    setLocalApiKey(storeApiKey);
+  }, [storeApiKey]);
 
   async function handleSyncLoad() {
     if (!syncInput.trim()) return;
@@ -753,28 +757,28 @@ function ProfileContent() {
             type="password"
             className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             placeholder="AIzaSy..."
-            value={userApiKey}
-            onChange={e => { setUserApiKey(e.target.value); setApiKeySaved(false); }}
+            value={localApiKey}
+            onChange={e => { setLocalApiKey(e.target.value); setApiKeySaved(false); }}
           />
           <button
             onClick={() => {
-              localStorage.setItem(USER_API_KEY_STORAGE, userApiKey.trim());
+              storeSetUserApiKey(localApiKey.trim());
               setApiKeySaved(true);
               setTimeout(() => setApiKeySaved(false), 2000);
             }}
             className="bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700">
             保存
           </button>
-          {userApiKey && (
+          {localApiKey && (
             <button
-              onClick={() => { localStorage.removeItem(USER_API_KEY_STORAGE); setUserApiKey(''); }}
+              onClick={() => { storeSetUserApiKey(''); setLocalApiKey(''); }}
               className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
               削除
             </button>
           )}
         </div>
         {apiKeySaved && <p className="text-xs text-green-600">✓ 保存しました</p>}
-        {userApiKey && !apiKeySaved && <p className="text-xs text-blue-600">APIキーが設定されています</p>}
+        {localApiKey && !apiKeySaved && <p className="text-xs text-blue-600">APIキーが設定されています（クラウド同期済み）</p>}
       </div>
 
       <div className="bg-white rounded-2xl p-6 mt-4 shadow-sm">

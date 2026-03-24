@@ -1,9 +1,12 @@
-export const USER_API_KEY_STORAGE = 'user_gemini_api_key';
 export const DAILY_LIMIT = 20;
 
 export function getUserApiKey(): string {
   if (typeof window === 'undefined') return '';
-  return localStorage.getItem(USER_API_KEY_STORAGE) ?? '';
+  // ストア経由（ct_user_api_key）から読む
+  try {
+    const raw = localStorage.getItem('ct_user_api_key');
+    return raw ? JSON.parse(raw) : '';
+  } catch { return ''; }
 }
 
 // サーバーから残り回数を取得
