@@ -201,6 +201,17 @@ export default function RecipePage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [newNutrient, setNewNutrient] = useState('');
   const [condition, setCondition] = useState('');
+  const [useInventory, setUseInventory] = useState(false);
+
+  // 在庫から食材名一覧を取得
+  function getInventoryNames(): string[] {
+    try {
+      const saved = localStorage.getItem('recipe_inventory');
+      if (!saved) return [];
+      const inv = JSON.parse(saved);
+      return [...(inv.fridge ?? []), ...(inv.freezer ?? []), ...(inv.pantry ?? [])].map((i: { name: string }) => i.name);
+    } catch { return []; }
+  }
 
   // 提案
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -304,11 +315,15 @@ export default function RecipePage() {
     setPhase('result');
     setDishes([]);
     setMessages([]);
+    const inventoryNames = useInventory ? getInventoryNames() : [];
+    const inventoryCondition = inventoryNames.length > 0
+      ? `【在庫活用】次の食材を優先的に使うこと: ${inventoryNames.join('、')}。${condition}`
+      : condition;
     try {
       const res = await fetch('/api/gemini/recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nutrients: selected, condition, goal, apiKey: getUserApiKey() }),
+        body: JSON.stringify({ nutrients: selected, condition: inventoryCondition, goal, apiKey: getUserApiKey() }),
       });
       const data = await res.json();
       setDishes(data.dishes ?? []);
@@ -631,9 +646,28 @@ export default function RecipePage() {
             )}
           </section>
 
+          {/* 在庫活用 */}
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-700">③ 在庫食材を活用する</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {useInventory
+                    ? (() => { const names = getInventoryNames(); return names.length > 0 ? `対象: ${names.join('・')}` : '在庫に食材が登録されていません'; })()
+                    : '在庫タブに登録した食材を優先的に使うレシピを提案'}
+                </p>
+              </div>
+              <button
+                onClick={() => setUseInventory(!useInventory)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${useInventory ? 'bg-green-500' : 'bg-gray-200'}`}>
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${useInventory ? 'translate-x-7' : 'translate-x-1'}`} />
+              </button>
+            </div>
+          </section>
+
           {/* 絞り込み */}
           <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-700">③ 絞り込み条件（任意）</h2>
+            <h2 className="font-semibold text-gray-700">④ 絞り込み条件（任意）</h2>
             <input value={condition} onChange={(e) => setCondition(e.target.value)}
               placeholder="例: 低コストで、残り物で、10分以内..."
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300" />
