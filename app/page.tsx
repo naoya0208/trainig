@@ -31,13 +31,18 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  // 日付が変わったらApple Watchカロリーを0にリセット
+  // 日付が変わったらApple Watchカロリーを0にリセット（その日の初回のみ）
   useEffect(() => {
-    if (profile?.appleWatchCalories && profile.appleWatchCalories > 0) {
-      setProfile({ ...profile, appleWatchCalories: 0 });
+    const now = localDate();
+    if (profile && profile.lastAppleWatchResetDate !== now) {
+      setProfile({
+        ...profile,
+        appleWatchCalories: 0,
+        lastAppleWatchResetDate: now,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [today]);
+  }, [today, profile?.lastAppleWatchResetDate]);
 
   if (!profile) {
     return (

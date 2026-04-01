@@ -183,8 +183,18 @@ function DetailContent({ detail }: { detail: DishDetail }) {
   );
 }
 
+const FOOD_DEFAULT_CATEGORIES = ['主食', '主菜', '副菜', '乳製品', '果物', '飲み物', 'お菓子・間食', 'サプリ', 'プロバイオティクス', 'その他'];
+
+function parseIngredient(s: string): { name: string; grams: number } {
+  const m = s.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*g/);
+  if (m) return { name: m[1].trim(), grams: parseFloat(m[2]) };
+  const m2 = s.match(/^(.+?)[（(].*?(\d+)\s*g/);
+  if (m2) return { name: m2[1].trim(), grams: parseFloat(m2[2]) };
+  return { name: s, grams: 0 };
+}
+
 export default function RecipePage() {
-  const { profile, addFood, saveFoodToHistory, hydrate } = useStore();
+  const { profile, saveFoodToHistory, hydrate, customCategories } = useStore();
   const [tab, setTab] = useState<'propose' | 'saved' | 'inventory'>('propose');
 
   // 目的・栄養素
@@ -193,15 +203,19 @@ export default function RecipePage() {
   const goalManualRef = useRef(false);                     // effect制御用（stateにするとeffectが再実行される）
   const [showGoalOverride, setShowGoalOverride] = useState(false);
 
-  // 食事登録モーダル
-  const [addToMealRecipe, setAddToMealRecipe] = useState<SavedRecipe | null>(null);
-  const [selectedMeal, setSelectedMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('dinner');
-  const [addToMealDone, setAddToMealDone] = useState(false);
+  // 食事タブに保存モーダル
+  const [saveToFoodRecipe, setSaveToFoodRecipe] = useState<SavedRecipe | null>(null);
+  const [saveToFoodGrams, setSaveToFoodGrams] = useState(300);
+  const [saveToFoodCategory, setSaveToFoodCategory] = useState('その他');
+  const [saveToFoodIngredients, setSaveToFoodIngredients] = useState<{ name: string; grams: number }[]>([]);
+  const [saveToFoodFavorite, setSaveToFoodFavorite] = useState(false);
+  const [saveToFoodDone, setSaveToFoodDone] = useState(false);
   const [customNutrients, setCustomNutrients] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [newNutrient, setNewNutrient] = useState('');
   const [condition, setCondition] = useState('');
   const [useInventory, setUseInventory] = useState(false);
+  const [inventoryOnly, setInventoryOnly] = useState(false);
 
   // 在庫から食材名一覧を取得
   function getInventoryNames(): string[] {
@@ -316,9 +330,14 @@ export default function RecipePage() {
     setDishes([]);
     setMessages([]);
     const inventoryNames = useInventory ? getInventoryNames() : [];
-    const inventoryCondition = inventoryNames.length > 0
-      ? `【在庫活用】次の食材を優先的に使うこと: ${inventoryNames.join('、')}。${condition}`
-      : condition;
+    let inventoryCondition = condition;
+    if (inventoryNames.length > 0) {
+      if (inventoryOnly) {
+        inventoryCondition = `【厳守: 在庫のみ使用】次の食材リストにあるものだけを使って作れるレシピに限定してください。リストにない主要食材（肉、魚、卵、野菜など）は一切使わないこと。ただし、調味料、水、油、小麦粉などの常備品は使用しても構いません。: ${inventoryNames.join('、')}。${condition}`;
+      } else {
+        inventoryCondition = `【在庫活用】次の食材を優先的に使うこと: ${inventoryNames.join('、')}。${condition}`;
+      }
+    }
     try {
       const res = await fetch('/api/gemini/recipe', {
         method: 'POST',
@@ -439,65 +458,58 @@ export default function RecipePage() {
     setMessages([]);
   }
 
-  // --- 食事に追加 ---
-  function addRecipeToMeal() {
-    if (!addToMealRecipe) return;
-    const recipe = addToMealRecipe;
+  // --- 食事タブに保存 ---
+  function openSaveToFood(recipe: SavedRecipe) {
+    const ings = recipe.detail?.ingredients?.map(parseIngredient) ?? [];
+    setSaveToFoodRecipe(recipe);
+    setSaveToFoodGrams(300);
+    setSaveToFoodCategory('主菜');
+    setSaveToFoodIngredients(ings);
+    setSaveToFoodFavorite(false);
+    setSaveToFoodDone(false);
+  }
+
+  function saveToFoodTab() {
+    if (!saveToFoodRecipe) return;
+    const recipe = saveToFoodRecipe;
     const n = recipe.nutrition;
+    const grams = saveToFoodGrams;
     const today = localDate();
     const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const grams = 300;
 
-    addFood({
-      id,
-      date: today,
-      meal: selectedMeal,
-      foodName: recipe.name,
-      grams,
-      calories: n?.calories ?? 0,
-      protein: n?.protein ?? 0,
-      fat: n?.fat ?? 0,
-      carbs: n?.carbs ?? 0,
-      micros: recipe.detail?.micros
-        ? {
-            fiber: recipe.detail.micros.fiber,
-            vitaminC: recipe.detail.micros.vitaminC,
-            vitaminD: recipe.detail.micros.vitaminD,
-            vitaminB12: recipe.detail.micros.vitaminB12,
-            vitaminE: recipe.detail.micros.vitaminE,
-            vitaminA: recipe.detail.micros.vitaminA,
-            vitaminB6: recipe.detail.micros.vitaminB6,
-            iron: recipe.detail.micros.iron,
-            calcium: recipe.detail.micros.calcium,
-            zinc: recipe.detail.micros.zinc,
-            magnesium: recipe.detail.micros.magnesium,
-            folate: recipe.detail.micros.folate,
-            omega3: recipe.detail.micros.omega3,
-          }
-        : undefined,
+    const per100g = n ? {
+      calories: Math.round((n.calories / (n.calories > 0 ? grams : 300)) * 100),
+      protein:  Math.round((n.protein  / grams) * 100 * 10) / 10,
+      fat:      Math.round((n.fat      / grams) * 100 * 10) / 10,
+      carbs:    Math.round((n.carbs    / grams) * 100 * 10) / 10,
+    } : { calories: 0, protein: 0, fat: 0, carbs: 0 };
+
+    const totalIng = saveToFoodIngredients.reduce((s, i) => s + i.grams, 0);
+    const ingredients = saveToFoodIngredients.map((i) => {
+      const ratio = totalIng > 0 ? i.grams / totalIng : 0;
+      return {
+        name: i.name, grams: i.grams,
+        calories: Math.round((n?.calories ?? 0) * ratio),
+        protein:  Math.round((n?.protein  ?? 0) * ratio * 10) / 10,
+        fat:      Math.round((n?.fat      ?? 0) * ratio * 10) / 10,
+        carbs:    Math.round((n?.carbs    ?? 0) * ratio * 10) / 10,
+      };
     });
 
-    if (n) {
-      const per100g = {
-        calories: Math.round((n.calories / grams) * 100),
-        protein:  Math.round((n.protein  / grams) * 100 * 10) / 10,
-        fat:      Math.round((n.fat      / grams) * 100 * 10) / 10,
-        carbs:    Math.round((n.carbs    / grams) * 100 * 10) / 10,
-      };
-      saveFoodToHistory({
-        id,
-        foodName: recipe.name,
-        grams,
-        per100g,
-        isFavorite: false,
-        lastUsed: today,
-        useCount: 1,
-        category: recipe.categories[0] ?? 'その他',
-      });
-    }
+    saveFoodToHistory({
+      id,
+      foodName: recipe.name,
+      grams,
+      per100g,
+      ingredients: ingredients.length > 0 ? ingredients : undefined,
+      isFavorite: saveToFoodFavorite,
+      lastUsed: today,
+      useCount: 1,
+      category: saveToFoodCategory,
+    });
 
-    setAddToMealDone(true);
-    setTimeout(() => { setAddToMealRecipe(null); setAddToMealDone(false); }, 1200);
+    setSaveToFoodDone(true);
+    setTimeout(() => { setSaveToFoodRecipe(null); setSaveToFoodDone(false); }, 1200);
   }
 
   // --- カテゴリ管理 ---
@@ -647,7 +659,7 @@ export default function RecipePage() {
           </section>
 
           {/* 在庫活用 */}
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-semibold text-gray-700">③ 在庫食材を活用する</h2>
@@ -663,6 +675,19 @@ export default function RecipePage() {
                 <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${useInventory ? 'translate-x-7' : 'translate-x-1'}`} />
               </button>
             </div>
+            {useInventory && (
+              <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">在庫にある食材のみを使用</p>
+                  <p className="text-xs text-gray-400 italic">※ リストにない主要食材を一切使いません</p>
+                </div>
+                <button
+                  onClick={() => setInventoryOnly(!inventoryOnly)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${inventoryOnly ? 'bg-blue-500' : 'bg-gray-200'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${inventoryOnly ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+            )}
           </section>
 
           {/* 絞り込み */}
@@ -825,9 +850,9 @@ export default function RecipePage() {
                       className="flex-1 py-1.5 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
                       📖 詳細・URL
                     </button>
-                    <button onClick={() => { setAddToMealRecipe(recipe); setAddToMealDone(false); setSelectedMeal('dinner'); }}
+                    <button onClick={() => openSaveToFood(recipe)}
                       className="flex-1 py-1.5 text-sm border border-green-200 rounded-xl text-green-600 hover:bg-green-50 transition-colors">
-                      🍽️ 食事に追加
+                      📥 食事タブに保存
                     </button>
                   </div>
                 </div>
@@ -919,37 +944,90 @@ export default function RecipePage() {
         </div>
       )}
 
-      {/* ===== 食事に追加モーダル ===== */}
-      {addToMealRecipe && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setAddToMealRecipe(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-bold text-gray-800">🍽️ 食事に追加</h2>
-              <button onClick={() => setAddToMealRecipe(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+      {/* ===== 食事タブに保存モーダル ===== */}
+      {saveToFoodRecipe && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setSaveToFoodRecipe(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-gray-800">📥 食事タブに保存</h2>
+              <button onClick={() => setSaveToFoodRecipe(null)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-sm text-gray-600">「{addToMealRecipe.name}」を今日の食事に追加します</p>
-              {addToMealRecipe.nutrition && (
-                <NutritionBar n={addToMealRecipe.nutrition} />
+              <p className="text-sm font-medium text-gray-700">「{saveToFoodRecipe.name}」</p>
+              {saveToFoodRecipe.nutrition && <NutritionBar n={saveToFoodRecipe.nutrition} />}
+              {!saveToFoodRecipe.nutrition && (
+                <p className="text-xs text-yellow-600 bg-yellow-50 px-3 py-2 rounded-xl">※ 栄養情報がありません。詳細を取得してから保存すると正確になります。</p>
               )}
-              {!addToMealRecipe.nutrition && (
-                <p className="text-xs text-yellow-600 bg-yellow-50 px-3 py-2 rounded-xl">※ 栄養情報がないため0で登録されます。詳細を取得してから追加すると正確になります。</p>
-              )}
+
+              {/* お気に入り */}
+              <button
+                onClick={() => setSaveToFoodFavorite(!saveToFoodFavorite)}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${saveToFoodFavorite ? 'bg-yellow-50 border-yellow-400 text-yellow-700' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+              >
+                <span className="text-lg">{saveToFoodFavorite ? '★' : '☆'}</span>
+                <span className="text-sm font-semibold">お気に入りに追加する</span>
+              </button>
+
+              {/* g入力 */}
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-2">食事タイミングを選ぶ</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {MEAL_OPTIONS.map((m) => (
-                    <button key={m.id} onClick={() => setSelectedMeal(m.id)}
-                      className={`py-2.5 text-sm rounded-xl border font-medium transition-all
-                        ${selectedMeal === m.id ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                      {m.label}
+                <p className="text-xs font-medium text-gray-500 mb-1">総量（g）</p>
+                <input type="number" min={1} value={saveToFoodGrams}
+                  onChange={(e) => setSaveToFoodGrams(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300" />
+              </div>
+
+              {/* カテゴリ */}
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">食事タブのカテゴリ</p>
+                <div className="flex flex-wrap gap-2">
+                  {[...FOOD_DEFAULT_CATEGORIES, ...customCategories].map((cat) => (
+                    <button key={cat} onClick={() => setSaveToFoodCategory(cat)}
+                      className={`px-3 py-1.5 text-xs rounded-full border transition-all
+                        ${saveToFoodCategory === cat ? 'bg-blue-50 border-blue-400 text-blue-700 font-medium' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {saveToFoodCategory === cat ? '✓ ' : ''}{cat}
                     </button>
                   ))}
                 </div>
               </div>
-              <button onClick={addRecipeToMeal} disabled={addToMealDone}
-                className={`w-full py-3 font-semibold rounded-xl transition-colors ${addToMealDone ? 'bg-green-500 text-white' : 'bg-green-500 text-white hover:bg-green-600'}`}>
-                {addToMealDone ? '✓ 追加しました！' : `${MEAL_OPTIONS.find((m) => m.id === selectedMeal)?.label}に追加する`}
+
+              {/* 内訳編集 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-gray-500">内訳（材料）</p>
+                  <button onClick={() => setSaveToFoodIngredients([...saveToFoodIngredients, { name: '', grams: 0 }])}
+                    className="text-xs text-blue-500 hover:text-blue-600">＋ 追加</button>
+                </div>
+                {saveToFoodIngredients.length === 0 && (
+                  <p className="text-xs text-gray-400 py-2">材料がありません。詳細を取得すると自動で反映されます。</p>
+                )}
+                <div className="space-y-2">
+                  {saveToFoodIngredients.map((ing, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input value={ing.name} placeholder="材料名"
+                        onChange={(e) => {
+                          const next = [...saveToFoodIngredients];
+                          next[i] = { ...next[i], name: e.target.value };
+                          setSaveToFoodIngredients(next);
+                        }}
+                        className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-300" />
+                      <input type="number" min={0} value={ing.grams || ''} placeholder="g"
+                        onChange={(e) => {
+                          const next = [...saveToFoodIngredients];
+                          next[i] = { ...next[i], grams: Number(e.target.value) };
+                          setSaveToFoodIngredients(next);
+                        }}
+                        className="w-16 px-2 py-1.5 text-sm border border-gray-200 rounded-xl text-right focus:outline-none focus:ring-1 focus:ring-blue-300" />
+                      <span className="text-xs text-gray-400">g</span>
+                      <button onClick={() => setSaveToFoodIngredients(saveToFoodIngredients.filter((_, j) => j !== i))}
+                        className="text-gray-300 hover:text-red-400 text-sm">✕</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={saveToFoodTab} disabled={saveToFoodDone}
+                className={`w-full py-3 font-semibold rounded-xl transition-colors ${saveToFoodDone ? 'bg-green-500 text-white' : 'bg-green-500 text-white hover:bg-green-600'}`}>
+                {saveToFoodDone ? '✓ 保存しました！' : '食事タブに保存する'}
               </button>
             </div>
           </div>

@@ -22,6 +22,7 @@ export interface Profile {
   isIrregularCycle?: boolean;  // 生理不順・不定期
   cycleLength?: number;        // 平均周期日数（デフォルト28）
   medications?: string[];      // 服用中の薬キー（MedicationKey[]）
+  lastAppleWatchResetDate?: string; // 最後にApple Watchカロリーをリセットした日付 (YYYY-MM-DD)
 }
 
 export type MenstrualPhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal';

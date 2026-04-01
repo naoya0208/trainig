@@ -192,6 +192,36 @@ function EditableFoodCard({ food, meal, onFavorite, onSave, onOnce, isSupplement
     }
   }
 
+  async function fetchNutrientsForIngredient(idx: number) {
+    const ing = ingredients[idx];
+    if (!ing || !ing.name.trim()) return;
+    setLoadingIng(true);
+    try {
+      const res = await fetch('/api/gemini/food', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: `${ing.name} 100g` }),
+      });
+      const data = await res.json();
+      if (data.foods?.[0]) {
+        const totals = sumIngredients(data.foods[0].ingredients as Ingredient[]);
+        // 現在のグラム数を維持しつつ、100gあたりの栄養素から現在のグラム数分を計算
+        const ratio = ing.grams / (totals.grams || 100);
+        setIngredients(prev => prev.map((item, i) => i === idx ? {
+          ...item,
+          calories: Math.round(totals.calories * ratio),
+          protein: Math.round(totals.protein * ratio * 10) / 10,
+          fat: Math.round(totals.fat * ratio * 10) / 10,
+          carbs: Math.round(totals.carbs * ratio * 10) / 10,
+          micros: totals.micros ? scaleMicros(totals.micros, ratio) : undefined
+        } : item));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingIng(false);
+    }
+  }
+
   // サプリ: baseを粒数でスケール / 食品: ingredients直接
   const displayIngredients = isSupplement
     ? baseIngredients.map((ing, i) => {
@@ -270,7 +300,24 @@ function EditableFoodCard({ food, meal, onFavorite, onSave, onOnce, isSupplement
             return (
               <div key={i}>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-700 flex-1 truncate">{ing.name}</span>
+                  <input
+                    value={ing.name}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setIngredients(prev => prev.map((item, j) => j === i ? { ...item, name: val } : item));
+                    }}
+                    className="text-sm text-gray-700 flex-1 truncate bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-200 rounded px-1"
+                  />
+                  {!isSupplement && ing.calories === 0 && ing.protein === 0 && (
+                    <button
+                      onClick={() => fetchNutrientsForIngredient(i)}
+                      disabled={loadingIng}
+                      className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition disabled:opacity-50"
+                      title="AIで栄養素を取得"
+                    >
+                      {loadingIng ? "..." : "AI取得"}
+                    </button>
+                  )}
                   {isSupplement ? (
                     <CountInput value={counts[i] || 1} onChange={c => updateCount(i, c)} unit={ing.servingUnit || '粒'} />
                   ) : (
