@@ -4,9 +4,99 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 import { useStore } from '@/lib/store';
 import { calcBMI, getBMIStatus, calcNutritionTargets } from '@/lib/calc';
 import { MICRO_DEFS, sumMicros } from '@/lib/micros';
-
 import { localDate } from '@/lib/date';
+
 function getToday() { return localDate(); }
+
+const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+
+function daysInMonth(y: number, m: number) { return new Date(y, m, 0).getDate(); }
+function firstDow(y: number, m: number) { return new Date(y, m - 1, 1).getDay(); }
+function pad(n: number) { return String(n).padStart(2, '0'); }
+function toDateStr(y: number, m: number, d: number) { return `${y}-${pad(m)}-${pad(d)}`; }
+
+function buildGrid(y: number, m: number): (string | null)[][] {
+  const total = daysInMonth(y, m);
+  const start = firstDow(y, m);
+  const cells: (string | null)[] = Array(start).fill(null);
+  for (let d = 1; d <= total; d++) cells.push(toDateStr(y, m, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+function WeightCalendar({
+  selectedDate, onSelect, recordedDates, today,
+}: {
+  selectedDate: string;
+  onSelect: (d: string) => void;
+  recordedDates: Set<string>;
+  today: string;
+}) {
+  const [vy, setVy] = useState(() => parseInt(selectedDate.slice(0, 4)));
+  const [vm, setVm] = useState(() => parseInt(selectedDate.slice(5, 7)));
+  const todayY = parseInt(today.slice(0, 4));
+  const todayM = parseInt(today.slice(5, 7));
+  const canNext = vy < todayY || (vy === todayY && vm < todayM);
+
+  function prevMonth() {
+    if (vm === 1) { setVy(y => y - 1); setVm(12); } else setVm(m => m - 1);
+  }
+  function nextMonth() {
+    if (!canNext) return;
+    if (vm === 12) { setVy(y => y + 1); setVm(1); } else setVm(m => m + 1);
+  }
+
+  const weeks = buildGrid(vy, vm);
+
+  return (
+    <div>
+      {/* 月ヘッダー */}
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={prevMonth} className="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-lg flex items-center justify-center transition">‹</button>
+        <span className="text-base font-bold text-gray-800">{vy}年{vm}月</span>
+        <button onClick={nextMonth} className={`w-8 h-8 rounded-full font-bold text-lg flex items-center justify-center transition ${canNext ? 'bg-blue-50 hover:bg-blue-100 text-blue-600' : 'bg-gray-50 text-gray-300 cursor-default'}`}>›</button>
+      </div>
+
+      {/* 曜日ヘッダー */}
+      <div className="grid grid-cols-7 mb-1">
+        {DOW.map((d, i) => (
+          <div key={d} className={`text-center text-xs font-semibold py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'}`}>{d}</div>
+        ))}
+      </div>
+
+      {/* 日グリッド */}
+      {weeks.map((week, wi) => (
+        <div key={wi} className="grid grid-cols-7">
+          {week.map((dateStr, di) => {
+            if (!dateStr) return <div key={di} />;
+            const isSelected = dateStr === selectedDate;
+            const isToday = dateStr === today;
+            const isFuture = dateStr > today;
+            const hasRecord = recordedDates.has(dateStr);
+            const day = parseInt(dateStr.slice(8));
+
+            return (
+              <button
+                key={dateStr}
+                disabled={isFuture}
+                onClick={() => onSelect(dateStr)}
+                className={`relative flex flex-col items-center justify-center aspect-square rounded-full text-sm font-medium transition
+                  ${isSelected ? 'bg-blue-600 text-white' : isToday ? 'border-2 border-blue-500 text-blue-600 font-bold' : isFuture ? 'text-gray-200 cursor-default' : di === 0 ? 'text-red-400 hover:bg-red-50' : di === 6 ? 'text-blue-400 hover:bg-blue-50' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                {day}
+                {hasRecord && (
+                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-blue-500'}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const NUTRIENT_FOODS: Record<string, string[]> = {
   'タンパク質':    ['鶏むね肉', '卵', 'さば', '豆腐', 'ギリシャヨーグルト', 'プロテイン'],
@@ -21,7 +111,6 @@ const NUTRIENT_FOODS: Record<string, string[]> = {
   'ビタミンC':     ['ブロッコリー', 'ピーマン', 'レモン', 'いちご', 'キウイ'],
   '亜鉛':          ['牡蠣', '牛肉', 'カシューナッツ', '卵', '豆腐'],
   'ナトリウム':    ['味噌汁', '梅干し', '漬物', '塩鮭', 'スポーツドリンク'],
-  // 美容栄養素
   'ビタミンE':     ['アーモンド', 'ひまわり油', 'アボカド', 'かぼちゃ', 'うなぎ'],
   'ビタミンA':     ['レバー', 'にんじん', 'ほうれん草', 'かぼちゃ', 'うなぎ'],
   'ビオチン':      ['卵黄', 'レバー', 'くるみ', 'アーモンド', 'さつまいも'],
@@ -39,6 +128,7 @@ export default function WeightPage() {
   const { profile, weightEntries, foodEntries, addWeight, setProfile, hydrate } = useStore();
   const [input, setInput] = useState('');
   const [today, setToday] = useState(getToday);
+  const [selectedDate, setSelectedDate] = useState(getToday);
   const [showAllBeautyMicros, setShowAllBeautyMicros] = useState(false);
 
   useEffect(() => {
@@ -51,12 +141,25 @@ export default function WeightPage() {
     return () => clearInterval(timer);
   }, []);
 
+  function handleSelectDate(d: string) {
+    setSelectedDate(d);
+    const entry = weightEntries.find(e => e.date === d);
+    setInput(entry ? entry.weight.toString() : '');
+  }
+
   function handleSave() {
     const w = parseFloat(input);
     if (isNaN(w) || w < 20 || w > 300) return;
-    addWeight({ date: today, weight: w });
-    if (profile) setProfile({ ...profile, weight: w });
+    addWeight({ date: selectedDate, weight: w });
+    if (profile && selectedDate === today) setProfile({ ...profile, weight: w });
   }
+
+  const recordedDates = new Set(weightEntries.map(e => e.date));
+  const existingEntry = weightEntries.find(e => e.date === selectedDate);
+  const isToday = selectedDate === today;
+
+  const selMonth = selectedDate.slice(0, 7).replace('-', '年') + '月';
+  const selDay = parseInt(selectedDate.slice(8)) + '日';
 
   const recent = weightEntries.slice(-30);
   const bmi = profile ? calcBMI(profile.weight, profile.height) : null;
@@ -64,7 +167,6 @@ export default function WeightPage() {
   const diff = profile ? parseFloat((profile.weight - profile.targetWeight).toFixed(1)) : null;
   const nutritionTargets = profile ? calcNutritionTargets(profile) : null;
 
-  // 過去7日間の栄養習慣集計
   const past7 = (() => {
     const days: string[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -100,16 +202,12 @@ export default function WeightPage() {
 
   const isBeautyMode = profile?.goalPurpose === 'beauty';
 
-  // 不足栄養素（PFCとmicros両方チェック）- 美容モード以外は基本栄養素のみ
   const deficient: { label: string; foods: string[] }[] = [];
   if (avg && nutritionTargets) {
     if (avg.protein < nutritionTargets.protein * 0.8) deficient.push({ label: 'タンパク質', foods: NUTRIENT_FOODS['タンパク質'] });
     MICRO_DEFS.filter(d => !d.isLimit && (!d.purpose || (isBeautyMode && d.purpose === 'beauty'))).forEach(d => {
       const v = avg.micros[d.key] ?? 0;
-      if (v < d.target * 0.8) {
-        const foods = NUTRIENT_FOODS[d.label] ?? [];
-        deficient.push({ label: d.label, foods });
-      }
+      if (v < d.target * 0.8) deficient.push({ label: d.label, foods: NUTRIENT_FOODS[d.label] ?? [] });
     });
   }
 
@@ -117,15 +215,32 @@ export default function WeightPage() {
     <div className="p-4 md:p-8 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-5">体重管理</h1>
 
+      {/* カレンダー */}
+      <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+        <WeightCalendar selectedDate={selectedDate} onSelect={handleSelectDate} recordedDates={recordedDates} today={today} />
+      </div>
+
       {/* 入力 */}
       <div className="bg-white rounded-2xl p-6 mb-5 shadow-sm">
-        <p className="text-sm text-gray-400 mb-3">今日の体重</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-gray-700">
+            {selMonth}{selDay}
+            {isToday && <span className="ml-2 text-xs text-blue-500 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">今日</span>}
+          </p>
+          {existingEntry && (
+            <p className="text-xs text-amber-500">記録済み: {existingEntry.weight} kg</p>
+          )}
+        </div>
         <div className="flex items-end gap-3 mb-5">
-          <input className="text-5xl font-bold text-gray-900 w-40 border-b-2 border-blue-500 focus:outline-none bg-transparent pb-1"
-            type="number" step="0.1" value={input} onChange={e => setInput(e.target.value)} placeholder="00.0" />
+          <input
+            className="text-5xl font-bold text-gray-900 w-40 border-b-2 border-blue-500 focus:outline-none bg-transparent pb-1"
+            type="number" step="0.1" value={input} onChange={e => setInput(e.target.value)} placeholder="00.0"
+          />
           <span className="text-xl text-gray-400 pb-2">kg</span>
         </div>
-        <button onClick={handleSave} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">記録する</button>
+        <button onClick={handleSave} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">
+          {existingEntry ? '上書き保存' : '記録する'}
+        </button>
       </div>
 
       {/* ステータス */}
@@ -174,7 +289,6 @@ export default function WeightPage() {
           <p className="text-sm font-semibold text-gray-500 mb-1">栄養素の習慣（過去7日平均）</p>
           <p className="text-xs text-gray-300 mb-4">{recordedDays.length}日分の記録から算出</p>
 
-          {/* PFC平均 */}
           <p className="text-xs font-semibold text-gray-400 mb-2">マクロ栄養素</p>
           <div className="space-y-3 mb-4">
             {[
@@ -199,13 +313,11 @@ export default function WeightPage() {
             })}
           </div>
 
-          {/* ビタミン・ミネラル（PFCに続けて表示） */}
           <div className="border-t border-gray-100 pt-3">
             <div className="flex items-center gap-2 mb-3">
               <p className="text-xs font-semibold text-gray-400">ビタミン・ミネラル</p>
               {isBeautyMode && <span className="text-xs bg-pink-100 text-pink-500 px-1.5 py-0.5 rounded-full font-semibold">美容モード</span>}
             </div>
-            {/* ① TOP3 バー表示（PFCと同スタイル） */}
             {(() => {
               const TOP3 = [
                 { key: 'vitaminC' as const, label: 'ビタミンC', unit: 'mg', bar: 'bg-orange-400' },
@@ -237,7 +349,6 @@ export default function WeightPage() {
               );
             })()}
 
-            {/* ② 高優先度美容4種（2列大カード・美容モード常時） */}
             {isBeautyMode && (
               <div className="bg-gradient-to-br from-pink-50 to-purple-50 border border-pink-200 rounded-xl p-3 mb-3">
                 <p className="text-xs font-semibold text-pink-500 mb-2">✨ 美容キー栄養素</p>
@@ -268,7 +379,6 @@ export default function WeightPage() {
               </div>
             )}
 
-            {/* ③ 基本微量栄養素（3列中カード・常時） */}
             {(() => {
               const TOP3_KEYS = new Set(['vitaminC', 'omega3', 'zinc']);
               const baseDefs = MICRO_DEFS.filter(d => !d.purpose && !TOP3_KEYS.has(d.key));
@@ -280,24 +390,12 @@ export default function WeightPage() {
                     const status = d.isLimit
                       ? (v > d.target ? 'over' : 'ok')
                       : (v === 0 ? 'none' : pct >= 80 ? 'ok' : pct >= 20 ? 'low' : 'critical');
-                    const cardBg = {
-                      ok:       'bg-emerald-50  border-emerald-200',
-                      low:      'bg-amber-50    border-amber-200',
-                      critical: 'bg-red-50      border-red-200',
-                      none:     'bg-gray-50     border-gray-200',
-                      over:     'bg-red-50      border-red-300',
-                    }[status];
-                    const valColor = {
-                      ok: 'text-emerald-700', low: 'text-amber-600', critical: 'text-red-500', none: 'text-gray-400', over: 'text-red-600',
-                    }[status];
-                    const barColor = {
-                      ok: 'bg-emerald-400', low: 'bg-amber-400', critical: 'bg-red-400', none: 'bg-gray-200', over: 'bg-red-500',
-                    }[status];
+                    const cardBg = { ok: 'bg-emerald-50 border-emerald-200', low: 'bg-amber-50 border-amber-200', critical: 'bg-red-50 border-red-200', none: 'bg-gray-50 border-gray-200', over: 'bg-red-50 border-red-300' }[status];
+                    const valColor = { ok: 'text-emerald-700', low: 'text-amber-600', critical: 'text-red-500', none: 'text-gray-400', over: 'text-red-600' }[status];
+                    const barColor = { ok: 'bg-emerald-400', low: 'bg-amber-400', critical: 'bg-red-400', none: 'bg-gray-200', over: 'bg-red-500' }[status];
                     return (
                       <div key={d.key} className={`rounded-xl border px-2 py-2 ${cardBg}`}>
-                        <div className="mb-0.5">
-                          <p className="text-xs font-semibold text-gray-600 truncate">{d.label}</p>
-                        </div>
+                        <p className="text-xs font-semibold text-gray-600 truncate mb-0.5">{d.label}</p>
                         <p className={`text-sm font-bold ${valColor}`}>{v}<span className="text-xs font-normal ml-0.5 text-gray-400">{d.unit}</span></p>
                         <div className="h-1 bg-white/60 rounded-full mt-1.5 overflow-hidden">
                           <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
@@ -310,13 +408,11 @@ export default function WeightPage() {
               );
             })()}
 
-            {/* ④ 低優先度美容（4列コンパクト・折りたたみ） */}
             {isBeautyMode && (() => {
               const lowDefs = MICRO_DEFS.filter(d => d.purpose === 'beauty' && d.priority === 'low');
               return (
                 <div>
-                  <button onClick={() => setShowAllBeautyMicros(v => !v)}
-                    className="text-xs text-pink-400 hover:text-pink-600 font-semibold flex items-center gap-1 mb-2">
+                  <button onClick={() => setShowAllBeautyMicros(v => !v)} className="text-xs text-pink-400 hover:text-pink-600 font-semibold flex items-center gap-1 mb-2">
                     {showAllBeautyMicros ? '▲ 詳細を閉じる' : `▼ 詳細栄養素（${lowDefs.length}種）`}
                   </button>
                   {showAllBeautyMicros && (
@@ -345,7 +441,6 @@ export default function WeightPage() {
             })()}
           </div>
 
-          {/* 不足栄養素と食品提案 */}
           {deficient.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs font-semibold text-red-500 mb-3">⚠️ 不足しがちな栄養素と補給できる食品</p>
@@ -372,10 +467,11 @@ export default function WeightPage() {
         {weightEntries.length === 0
           ? <p className="text-center text-gray-300 py-8">まだ記録がありません</p>
           : [...weightEntries].reverse().slice(0, 30).map(e => (
-            <div key={e.date} className="flex justify-between py-2.5 border-b border-gray-50 last:border-0">
-              <span className="text-sm text-gray-600">{e.date}</span>
+            <button key={e.date} onClick={() => handleSelectDate(e.date)}
+              className={`w-full flex justify-between py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition text-left ${e.date === selectedDate ? 'text-blue-600 font-bold' : ''}`}>
+              <span className="text-sm">{e.date}</span>
               <span className="text-sm font-semibold">{e.weight} kg</span>
-            </div>
+            </button>
           ))}
       </div>
     </div>
