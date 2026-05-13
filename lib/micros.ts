@@ -19,6 +19,7 @@ export const MICRO_DEFS: {
   { key: 'zinc',       label: '亜鉛',        unit: 'mg', target: 10 },
   { key: 'omega3',     label: 'EPA+DHA',     unit: 'g',  target: 2.0 },
   { key: 'sodium',     label: 'ナトリウム',  unit: 'mg', target: 2000, isLimit: true },
+  { key: 'potassium',  label: 'カリウム',    unit: 'mg', target: 3500 },
   // 美容向け・高優先度（常時表示）
   { key: 'vitaminE',        label: 'ビタミンE',    unit: 'mg', target: 6.0,  purpose: 'beauty', priority: 'high' },
   { key: 'biotin',          label: 'ビオチン',     unit: 'μg', target: 50,   purpose: 'beauty', priority: 'high' },

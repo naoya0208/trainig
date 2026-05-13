@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/recipe', label: 'レシピ', icon: '🥗' },
   { href: '/calendar', label: '記録', icon: '📅' },
   { href: '/weight', label: '体重', icon: '⚖️' },
+  { href: '/competition', label: '大会', icon: '🏆' },
   { href: '/profile', label: '設定', icon: '👤' },
 ];
 

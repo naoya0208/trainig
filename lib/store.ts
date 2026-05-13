@@ -14,6 +14,7 @@ export interface MicroNutrients {
   zinc?: number;       // 亜鉛 mg
   omega3?: number;     // EPA+DHA g
   sodium?: number;     // ナトリウム mg
+  potassium?: number;  // カリウム mg
   // 美容向け
   vitaminE?: number;        // ビタミンE mg
   vitaminA?: number;        // ビタミンA μg
@@ -80,6 +81,14 @@ export interface WeightEntry {
   weight: number;
 }
 
+export interface CompetitionSettings {
+  date: string;
+  waterLoading: boolean;
+  sodiumCut: boolean;
+  carbDepletion: boolean;
+  carbLoad: boolean;
+}
+
 export interface WorkoutSet { reps: number; weightKg: number; }
 export interface WorkoutExercise { name: string; bodyPart: string; sets: WorkoutSet[]; }
 export interface WorkoutSession {
@@ -101,10 +110,12 @@ interface Store {
   workoutSessions: WorkoutSession[];
   waterEntries: WaterEntry[];
   customMedications: CustomMedication[];
+  competitionSettings: CompetitionSettings | null;
   syncCode: string;
   syncing: boolean;
   userApiKey: string;
   setUserApiKey: (key: string) => void;
+  setCompetitionSettings: (s: CompetitionSettings) => void;
   setProfile: (p: Profile) => void;
   addFood: (e: FoodEntry) => void;
   removeFood: (id: string) => void;
@@ -135,6 +146,7 @@ const KEYS = {
   workout: 'ct_workout', syncCode: 'ct_sync_code', savedFoods: 'ct_saved_foods',
   favoriteGroups: 'ct_fav_groups', customCategories: 'ct_custom_cats',
   water: 'ct_water', customMedications: 'ct_meds', userApiKey: 'ct_user_api_key',
+  competition: 'ct_competition',
 };
 
 function save<T>(key: string, val: T) {
@@ -155,10 +167,12 @@ export const useStore = create<Store>((set, get) => ({
   workoutSessions: [],
   waterEntries: [],
   customMedications: [],
+  competitionSettings: null,
   syncCode: '',
   syncing: false,
   userApiKey: '',
   setUserApiKey: (key) => { set({ userApiKey: key }); save(KEYS.userApiKey, key); get().syncToCloud(); },
+  setCompetitionSettings: (s) => { set({ competitionSettings: s }); save(KEYS.competition, s); },
 
   setProfile: (p) => { set({ profile: p }); save(KEYS.profile, p); get().syncToCloud(); },
   addFood: (e) => {
@@ -303,6 +317,7 @@ export const useStore = create<Store>((set, get) => ({
       workoutSessions: load(KEYS.workout, []),
       waterEntries: load(KEYS.water, []),
       customMedications: load(KEYS.customMedications, []),
+      competitionSettings: load(KEYS.competition, null),
       userApiKey: load(KEYS.userApiKey, ''),
       syncCode,
     });
