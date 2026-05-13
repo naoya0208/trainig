@@ -4,11 +4,11 @@ import { usePathname } from 'next/navigation';
 
 const LINKS = [
   { href: '/', label: 'ホーム', icon: '🏠' },
+  { href: '/competition', label: '大会', icon: '🏆' },
   { href: '/food', label: '食事', icon: '🍽️' },
   { href: '/recipe', label: 'レシピ', icon: '🥗' },
   { href: '/calendar', label: '記録', icon: '📅' },
   { href: '/weight', label: '体重', icon: '⚖️' },
-  { href: '/competition', label: '大会', icon: '🏆' },
   { href: '/profile', label: '設定', icon: '👤' },
 ];
 

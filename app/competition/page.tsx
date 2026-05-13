@@ -103,7 +103,9 @@ export default function CompetitionPage() {
   const todayCarbs = Math.round(todayFoods.reduce((s, e) => s + e.carbs, 0) * 10) / 10;
   const todaySodium = Math.round(micros.sodium ?? 0);
   const todayPotassium = Math.round(micros.potassium ?? 0);
-  const todayWaterMl = waterEntries.find(e => e.date === today)?.ml ?? 0;
+  const todayDrinkMl = waterEntries.find(e => e.date === today)?.ml ?? 0;
+  const todayFoodWaterMl = Math.round(sumMicros(todayFoods).water ?? 0);
+  const todayWaterMl = todayDrinkMl + todayFoodWaterMl;
 
   // Na:K比
   const naKRatio = todayPotassium > 0 ? Math.round((todaySodium / todayPotassium) * 100) / 100 : null;
@@ -191,7 +193,9 @@ export default function CompetitionPage() {
           color: 'bg-blue-500',
           tip: wTarget && daysLeft !== null && daysLeft <= 1 ? '⚠ 水分を急激に制限中。脱水に注意してください。' : null,
           rows: wTarget ? [
-            { label: '摂取量', value: `${todayWaterMl} ml` },
+            { label: '飲料', value: `${todayDrinkMl} ml` },
+            { label: '食品', value: `${todayFoodWaterMl} ml` },
+            { label: '合計', value: `${todayWaterMl} ml` },
             { label: '目標', value: `${wTarget.ml} ml` },
             { label: '達成率', value: `${Math.min(100, Math.round(todayWaterMl / wTarget.ml * 100))}%` },
           ] : [],

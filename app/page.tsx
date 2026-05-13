@@ -70,7 +70,9 @@ export default function Home() {
 
   const todayFood = foodEntries.filter(e => e.date === today);
   const todayWork = workoutSessions.filter(s => s.date === today);
-  const todayWaterMl = waterEntries.find(w => w.date === today)?.ml ?? 0;
+  const todayDrinkMl = waterEntries.find(w => w.date === today)?.ml ?? 0;
+  const todayFoodWaterMl = Math.round(sumMicros(todayFood).water ?? 0);
+  const todayWaterMl = todayDrinkMl + todayFoodWaterMl;
   const waterTargetMl = Math.round(profile.weight * 30); // 体重×30ml/日
   const menstrualInfo = profile.gender === 'female' && profile.lastPeriodDate
     ? getMenstrualPhase(profile.lastPeriodDate, profile.cycleLength) : null;
@@ -694,10 +696,17 @@ export default function Home() {
             <p className="text-xs text-gray-400">{Math.min(100, Math.round(todayWaterMl / waterTargetMl * 100))}%</p>
           </div>
         </div>
-        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
           <div className="h-full rounded-full bg-blue-400 transition-all duration-500"
             style={{ width: `${Math.min(100, Math.round(todayWaterMl / waterTargetMl * 100))}%` }} />
         </div>
+        {todayFoodWaterMl > 0 && (
+          <div className="flex gap-3 text-xs text-gray-400 mb-3">
+            <span>💧 飲料 {todayDrinkMl}ml</span>
+            <span>🥗 食品 {todayFoodWaterMl}ml</span>
+            <span className="text-blue-500 font-semibold">計 {todayWaterMl}ml</span>
+          </div>
+        )}
         <div className="flex gap-2">
           {[200, 350, 500].map(ml => (
             <button key={ml} onClick={() => addWater(today, ml)}
@@ -705,8 +714,8 @@ export default function Home() {
               +{ml}ml
             </button>
           ))}
-          <button onClick={() => addWater(today, -Math.min(200, todayWaterMl))}
-            disabled={todayWaterMl === 0}
+          <button onClick={() => addWater(today, -Math.min(200, todayDrinkMl))}
+            disabled={todayDrinkMl === 0}
             className="px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl py-2 text-sm font-semibold text-gray-400 transition disabled:opacity-30">
             −
           </button>

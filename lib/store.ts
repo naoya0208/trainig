@@ -15,6 +15,7 @@ export interface MicroNutrients {
   omega3?: number;     // EPA+DHA g
   sodium?: number;     // ナトリウム mg
   potassium?: number;  // カリウム mg
+  water?: number;      // 食品中の水分 ml
   // 美容向け
   vitaminE?: number;        // ビタミンE mg
   vitaminA?: number;        // ビタミンA μg
