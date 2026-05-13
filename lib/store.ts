@@ -126,6 +126,7 @@ interface Store {
   removeWorkout: (id: string) => void;
   saveFoodToHistory: (food: SavedFood) => void;
   removeSavedFood: (id: string) => void;
+  updateSavedFood: (id: string, updates: Partial<SavedFood>) => void;
   updateSavedFoodCategory: (id: string, category: string) => void;
   addCustomCategory: (name: string) => void;
   removeCustomCategory: (name: string) => void;
@@ -218,7 +219,10 @@ export const useStore = create<Store>((set, get) => ({
     const next = get().savedFoods.filter(f => f.id !== id);
     set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
   },
-
+  updateSavedFood: (id, updates) => {
+    const next = get().savedFoods.map(f => f.id === id ? { ...f, ...updates } : f);
+    set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();
+  },
   updateSavedFoodCategory: (id, category) => {
     const next = get().savedFoods.map(f => f.id === id ? { ...f, category } : f);
     set({ savedFoods: next }); save(KEYS.savedFoods, next); get().syncToCloud();

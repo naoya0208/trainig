@@ -527,8 +527,10 @@ function TodayEntryRow({ entry, onRemove, onUpdate, isFav, onFav }: {
 }
 
 export default function FoodPage() {
-  const { foodEntries, savedFoods, favoriteGroups, customCategories, addFood, removeFood, updateFood, saveFoodToHistory, removeSavedFood, updateSavedFoodCategory, addCustomCategory, removeCustomCategory, toggleFavorite, addFavoriteGroup, updateFavoriteGroup, removeFavoriteGroup, hydrate } = useStore();
+  const { foodEntries, savedFoods, favoriteGroups, customCategories, addFood, removeFood, updateFood, saveFoodToHistory, removeSavedFood, updateSavedFood, updateSavedFoodCategory, addCustomCategory, removeCustomCategory, toggleFavorite, addFavoriteGroup, updateFavoriteGroup, removeFavoriteGroup, hydrate } = useStore();
   const [tab, setTab] = useState<'ai' | 'favorites' | 'history' | 'categories'>('ai');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; current: string } | null>(null);
   const [query, setQuery] = useState('');
   function mealFromTime(time: string): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
     const h = parseInt(time.split(':')[0]);
@@ -650,6 +652,35 @@ export default function FoodPage() {
     const totals = sumIngredients(ingredients);
     addFood(buildEntry(food.name, totals, food.note));
     setAddedFoods(prev => new Set([...prev, food.name]));
+  }
+
+  async function handleBulkUpdateNutrition() {
+    if (bulkUpdating || savedFoods.length === 0) return;
+    setBulkUpdating(true);
+    setBulkProgress({ done: 0, total: savedFoods.length, current: '' });
+    for (const food of savedFoods) {
+      setBulkProgress(p => p ? { ...p, current: food.foodName } : p);
+      try {
+        const isSupplement = !!food.servingUnit && !!food.gramsPerUnit;
+        const res = await fetch('/api/gemini/food', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: food.foodName, mode: isSupplement ? 'supplement' : undefined, apiKey: getUserApiKey() }),
+        });
+        const data = await res.json();
+        if (data.foods?.[0]) {
+          const f = data.foods[0];
+          const totals = sumIngredients(f.ingredients as Ingredient[]);
+          const newPer100g = totals.grams > 0
+            ? { calories: Math.round(totals.calories / totals.grams * 100), protein: Math.round(totals.protein / totals.grams * 100 * 10) / 10, fat: Math.round(totals.fat / totals.grams * 100 * 10) / 10, carbs: Math.round(totals.carbs / totals.grams * 100 * 10) / 10 }
+            : food.per100g;
+          updateSavedFood(food.id, { per100g: newPer100g, ingredients: (f.ingredients as any[]).length > 0 ? f.ingredients : food.ingredients });
+        }
+      } catch { /* skip */ }
+      setBulkProgress(p => p ? { ...p, done: p.done + 1 } : p);
+    }
+    setBulkUpdating(false);
+    setBulkProgress(null);
   }
 
   function handleAddSaved(saved: SavedFood, grams: number) {
@@ -781,6 +812,31 @@ export default function FoodPage() {
       {/* お気に入り */}
       {tab === 'favorites' && (
         <div className="space-y-4 mb-5">
+          {/* 一括更新バナー */}
+          <div className="bg-white rounded-2xl px-4 py-3 shadow-sm">
+            {bulkUpdating && bulkProgress ? (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-xs font-semibold text-blue-600">栄養素を更新中... {bulkProgress.done}/{bulkProgress.total}</p>
+                  <p className="text-xs text-gray-400 truncate max-w-[60%]">{bulkProgress.current}</p>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.round(bulkProgress.done / bulkProgress.total * 100)}%` }} />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">栄養素を最新情報に更新</p>
+                  <p className="text-xs text-gray-400 mt-0.5">全{savedFoods.length}品をAIで再取得（カリウム・水分含む）</p>
+                </div>
+                <button onClick={handleBulkUpdateNutrition} disabled={savedFoods.length === 0}
+                  className="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-40 transition whitespace-nowrap">
+                  一括更新
+                </button>
+              </div>
+            )}
+          </div>
           {/* グループセクション */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
