@@ -531,6 +531,8 @@ export default function FoodPage() {
   const [tab, setTab] = useState<'ai' | 'favorites' | 'history' | 'categories'>('ai');
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; current: string } | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   function mealFromTime(time: string): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
     const h = parseInt(time.split(':')[0]);
@@ -654,11 +656,14 @@ export default function FoodPage() {
     setAddedFoods(prev => new Set([...prev, food.name]));
   }
 
-  async function handleBulkUpdateNutrition() {
-    if (bulkUpdating || savedFoods.length === 0) return;
+  async function handleUpdateNutrition(ids: string[]) {
+    if (bulkUpdating || ids.length === 0) return;
     setBulkUpdating(true);
-    setBulkProgress({ done: 0, total: savedFoods.length, current: '' });
-    for (const food of savedFoods) {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    const targets = savedFoods.filter(f => ids.includes(f.id));
+    setBulkProgress({ done: 0, total: targets.length, current: '' });
+    for (const food of targets) {
       setBulkProgress(p => p ? { ...p, current: food.foodName } : p);
       try {
         const isSupplement = !!food.servingUnit && !!food.gramsPerUnit;
@@ -681,6 +686,14 @@ export default function FoodPage() {
     }
     setBulkUpdating(false);
     setBulkProgress(null);
+  }
+
+  function toggleSelectId(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
 
   function handleAddSaved(saved: SavedFood, grams: number) {
@@ -812,27 +825,49 @@ export default function FoodPage() {
       {/* お気に入り */}
       {tab === 'favorites' && (
         <div className="space-y-4 mb-5">
-          {/* 一括更新バナー */}
+          {/* 栄養素更新バナー */}
           <div className="bg-white rounded-2xl px-4 py-3 shadow-sm">
             {bulkUpdating && bulkProgress ? (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-xs font-semibold text-blue-600">栄養素を更新中... {bulkProgress.done}/{bulkProgress.total}</p>
+                  <p className="text-xs font-semibold text-blue-600">更新中... {bulkProgress.done}/{bulkProgress.total}</p>
                   <p className="text-xs text-gray-400 truncate max-w-[60%]">{bulkProgress.current}</p>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.round(bulkProgress.done / bulkProgress.total * 100)}%` }} />
                 </div>
               </div>
+            ) : selectMode ? (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-gray-700">
+                    {selectedIds.size > 0 ? `${selectedIds.size}品を選択中` : '更新する食品を選択'}
+                  </p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setSelectedIds(new Set(savedFoods.map(f => f.id)))}
+                      className="text-xs text-blue-500 hover:text-blue-700 font-semibold px-2 py-1">全選択</button>
+                    <button onClick={() => setSelectedIds(new Set())}
+                      className="text-xs text-gray-400 hover:text-gray-600 font-semibold px-2 py-1">解除</button>
+                    <button onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
+                      className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1">キャンセル</button>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleUpdateNutrition([...selectedIds])}
+                  disabled={selectedIds.size === 0}
+                  className="w-full bg-blue-600 text-white text-sm font-bold py-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-40 transition">
+                  選択した{selectedIds.size}品を更新（AI {selectedIds.size}回使用）
+                </button>
+              </div>
             ) : (
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-gray-700">栄養素を最新情報に更新</p>
-                  <p className="text-xs text-gray-400 mt-0.5">全{savedFoods.length}品をAIで再取得（カリウム・水分含む）</p>
+                  <p className="text-xs text-gray-400 mt-0.5">カリウム・水分など新項目を取得</p>
                 </div>
-                <button onClick={handleBulkUpdateNutrition} disabled={savedFoods.length === 0}
+                <button onClick={() => setSelectMode(true)} disabled={savedFoods.length === 0}
                   className="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-40 transition whitespace-nowrap">
-                  一括更新
+                  選択して更新
                 </button>
               </div>
             )}
@@ -943,9 +978,18 @@ export default function FoodPage() {
                     {favorites.length === 0
                       ? <p className="text-center text-gray-300 py-4 text-sm">★をつけた食品がありません</p>
                       : favorites.map(f => (
-                        <SwipeToDelete key={f.id} onDelete={() => removeSavedFood(f.id)}>
-                          <div className="px-4"><SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} allCategories={allCategories} onCategoryChange={updateSavedFoodCategory} /></div>
-                        </SwipeToDelete>
+                        <div key={f.id} className="flex items-center">
+                          {selectMode && (
+                            <button onClick={() => toggleSelectId(f.id)} className={`ml-3 w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition ${selectedIds.has(f.id) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300'}`}>
+                              {selectedIds.has(f.id) && <span className="text-xs font-bold">✓</span>}
+                            </button>
+                          )}
+                          <div className={`flex-1 ${selectMode ? '' : ''}`}>
+                            <SwipeToDelete onDelete={() => removeSavedFood(f.id)}>
+                              <div className="px-4"><SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} allCategories={allCategories} onCategoryChange={updateSavedFoodCategory} /></div>
+                            </SwipeToDelete>
+                          </div>
+                        </div>
                       ))}
                   </div>
                 )}
@@ -974,9 +1018,18 @@ export default function FoodPage() {
                 {isOpen && (
                   <div className="pb-3 border-t border-gray-50 mt-0">
                     {items.map(f => (
-                      <SwipeToDelete key={f.id} onDelete={() => removeSavedFood(f.id)}>
-                        <div className="px-4"><SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} allCategories={allCategories} onCategoryChange={updateSavedFoodCategory} /></div>
-                      </SwipeToDelete>
+                      <div key={f.id} className="flex items-center">
+                        {selectMode && (
+                          <button onClick={() => toggleSelectId(f.id)} className={`ml-3 w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition ${selectedIds.has(f.id) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300'}`}>
+                            {selectedIds.has(f.id) && <span className="text-xs font-bold">✓</span>}
+                          </button>
+                        )}
+                        <div className="flex-1">
+                          <SwipeToDelete onDelete={() => removeSavedFood(f.id)}>
+                            <div className="px-4"><SavedFoodCard saved={f} meal={meal} onAdd={handleAddSaved} onToggleFav={toggleFavorite} allCategories={allCategories} onCategoryChange={updateSavedFoodCategory} /></div>
+                          </SwipeToDelete>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
